@@ -12,10 +12,10 @@
   ],
   "repository": {
     "type": "github",
-    "url": "https://github.com/devprodest/devprodest-elf-analyzer"
+    "url": "https://github.com/devprodest/elf-analyzer"
   },
   "bugs": {
-    "url": "https://github.com/devprodest/devprodest-elf-analyzer/issues"
+    "url": "https://github.com/devprodest/elf-analyzer/issues"
   },
   "activationEvents": [],
   "main": "./dist/extension.js",
