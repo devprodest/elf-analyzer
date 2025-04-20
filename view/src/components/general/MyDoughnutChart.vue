@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <div ref="my-chart">
         <span class="my-chart-title">
             {{ props.title }}
         </span>
@@ -8,7 +8,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, useTemplateRef } from 'vue';
 
 import { Doughnut as doughnutchart } from 'vue-chartjs';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, Filler, Colors } from 'chart.js';
@@ -24,6 +24,8 @@ const props = defineProps<{
     title?: string;
 }>();
 
+const symbols = useTemplateRef("my-chart");
+ChartJS.defaults.color = window.getComputedStyle(document.documentElement).getPropertyValue('--vscode-editor-foreground') || "#cccc00";
 
 const options = {
     responsive: false,
@@ -35,7 +37,7 @@ const options = {
         colors: {
             enabled: true,
             forceOverride: true
-        }
+        },
     }
 }
 

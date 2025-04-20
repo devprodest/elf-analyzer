@@ -1,11 +1,16 @@
 import { execSync } from "child_process";
 import { ElfElement, ElfInfo } from "../common/elfInfo";
+import * as vscode from 'vscode';
+import { logChannel } from "./extension";
 
-// llvm-nm test.elf -S -l -t dec --format=sysv
 
 export async function getElfInfo(file: string): Promise<ElfInfo | null> {
     try {
-        const rawlines = execSync('llvm-nm -S -l -t d --format=sysv ' + file, {}).toString()
+        logChannel.info("get info from", file);
+
+        const toolNM = vscode.workspace.getConfiguration().get<string>("devprodest-elf-analyzer.toolchain-nm-bin-path") ?? "llvm-nm";
+
+        const rawlines = execSync(`"${toolNM}" -S -l -t d --format=sysv "${file}"`, {}).toString()
             .split("\n").map(l => l.split("|")).filter(l => l.length > 5);
 
 
@@ -21,7 +26,7 @@ export async function getElfInfo(file: string): Promise<ElfInfo | null> {
                 class: field[2],
                 type: field[3],
                 size: parseInt(field[4]),
-                section: section_line?.[1].toString(),
+                section: section_line?.[1].toString() ?? "",
                 line
             };
         }

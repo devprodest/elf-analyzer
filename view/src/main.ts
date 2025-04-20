@@ -11,7 +11,7 @@ app.component('MyEmptyContainer', MyEmptyContainer);
 app.component('MyDoughnutChart', MyDoughnutChart);
 
 
-import "@/assets/test.vscode.css";
+// import "@/assets/test.vscode.css";
 import "@/assets/style.css";
 
 import { library } from '@fortawesome/fontawesome-svg-core';

@@ -1,46 +1,61 @@
 <template>
-  <div class="elf-body">
 
+  <div class="elf-body" v-if="ready">
     <div class="elf-statistics">
       <MyDoughnutChart title="ELF section sizes" :data=elfData></MyDoughnutChart>
       <MyDoughnutChart :title="`Size of ${sectionView} section`" :data=sectionData></MyDoughnutChart>
     </div>
 
-    <div class="elf-symbols" ref="elf-symbols">
-      <MyTable :fields="fields" v-model:sortby="sortBy" v-model:sortdesc="sortDesc" :items=items @sortchange="sortData">
+    <div class="elf-data">
 
-        <template v-slot:address="address">
-          0x{{ address.data.toString(16).padStart(8, '0') }}
-        </template>
+      <div class="elf-bar">
+        <div>
+          <MyButton @click="refresh">Reload</MyButton>
+        </div>
+        <input type="search" placeholder="Filter" v-model="filter" class="elf-filter vscode-input">
+      </div>
 
-        <template v-slot:size="size">
-          {{ toHEX(size.data) }}
-        </template>
+      <div class="elf-symbols" ref="elf-symbols">
 
-        <template v-slot:line="line">
-          <a :href="'file:///' + line.data">{{ line.data }}</a>
-        </template>
+        <MyTable :fields="fields" v-model:sortby="sortBy" v-model:sortdesc="sortDesc" :items=itemsFiltered
+          @sortchange="sortData">
 
-        <template v-slot:section="section">
-          <span class="view-section">
-            <span class="view-section-icon"><font-awesome-icon icon="fa-regular fa-eye"
-                @click="sectionDataUpdate(section.data)" /></span>
-            <span>{{ section.data }}</span>
-          </span>
-        </template>
+          <template v-slot:address="address">
+            0x{{ address.data.toString(16).padStart(8, '0') }}
+          </template>
 
-      </MyTable>
+          <template v-slot:size="size">
+            {{ toHEX(size.data) }}
+          </template>
+
+          <template v-slot:line="line">
+            <a @click="elfStore.navigateTo(line.data)" class="elf-symbol-file">{{ filenameCut(line.data ?? "") }}</a>
+          </template>
+
+          <template v-slot:section="section">
+            <span class="view-section">
+              <span class="view-section-icon"><font-awesome-icon icon="fa-regular fa-eye"
+                  @click="sectionDataUpdate(section.data)" /></span>
+              <span>{{ section.data }}</span>
+            </span>
+          </template>
+
+        </MyTable>
+      </div>
     </div>
-
   </div>
+
+  <div class="elf-body" v-else> LOADING ... </div>
+
 </template>
 
 
 <script setup lang="ts">
-import { onMounted, ref, useTemplateRef } from 'vue';
+import { computed, onMounted, ref, useTemplateRef, watch } from 'vue';
 import { useElfStore } from './stores/elf';
 
 import MyTable from './components/general/MyTable.vue';
+import MyButton from './components/general/MyButton.vue';
 import type { MyTableField } from './components/general/MyTable.vue';
 import type { ElfElement } from '../../common/elfInfo';
 import MyDoughnutChart, { type MyDoughnutItem } from './components/general/MyDoughnutChart.vue';
@@ -57,17 +72,27 @@ const fields: MyTableField[] = [
   { sortable: true, class: "", key: "line", title: "File" },
 ];
 
+const filter = ref<string>("");
+
 
 const sortBy = ref<string>('name');
 const sortDesc = ref(false);
 const items = ref<Array<ElfElement>>([]);
-
 
 const radix = ref(false);
 const toHEX = (val: number): string => {
   if (radix.value) return `0x${val.toString(16).padStart(8, '0')}`
   return val.toString(10);
 };
+
+const itemsFiltered = computed(() =>
+  items.value.filter(x =>
+    filter.value?.length > 0
+      ? (x.name?.includes(filter.value) || x.address?.toString().includes(filter.value) || x.size?.toString().includes(filter.value) || x.section?.includes(filter.value) || x.line?.includes(filter.value))
+      : true
+  )
+)
+
 
 
 const symbols = useTemplateRef("elf-symbols");
@@ -97,7 +122,7 @@ const sortData = async () => {
     return 0;
   });
 
-  symbols.value?.scrollTo(0,0);
+  symbols.value?.scrollTo(0, 0);
 }
 
 
@@ -136,18 +161,25 @@ const elfDataUpdate = () => {
 };
 
 
+const filenameCut = (filename: string): string => {
+  if (filename.length < 48) return filename;
+  return filename.substring(0, 10) + "..." + filename.slice(-36);
+};
 
+
+const ready = ref<boolean>(false);
 const refresh = async () => {
-  // @ts-ignore
-  elfStore.updateElfInfo();
-  items.value = elfStore.elf.elements;
+  items.value = JSON.parse(elfStore.info).elements;
   sectionDataUpdate(items.value[0].section);
   elfDataUpdate();
+
+  ready.value = true;
 }
 
+// refresh();
 
 onMounted(async () => {
-  await refresh();
+  await elfStore.updateElfInfo(refresh);
 });
 
 </script>
@@ -155,6 +187,7 @@ onMounted(async () => {
 
 <style lang="scss">
 .elf-body {
+  width: 100%;
   display: flex;
   gap: 1rem;
   flex-direction: row;
@@ -169,7 +202,7 @@ onMounted(async () => {
     display: flex;
     flex-direction: column;
     padding: 1rem;
-    background-color: var(--vscode-sideBarSectionHeader-background);
+    background-color: var(--vscode-sideBar-background);
     border-radius: 10px;
     align-items: center
   }
@@ -180,26 +213,69 @@ onMounted(async () => {
 }
 
 .view-section {
-  display: flex;
   flex-direction: row;
-  gap: .5rem;
   align-items: center;
+  display: flex;
+  gap: .5rem;
 
   .view-section-icon {
     cursor: pointer;
     padding: .5rem;
     margin: -.5rem;
 
-    :hover {
+    &:hover {
       transition: 0.3s;
       color: var(--vscode-button-background);
     }
   }
 }
 
+
+.vscode-input {
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  color: var(--vscode-input-foreground);
+  border-radius: 2px;
+  padding: .5rem;
+  outline: none;
+
+  &:focus {
+    border: 1px solid var(--vscode-inputOption-activeBorder, transparent);
+  }
+}
+
+
+.elf-symbol-file {
+  cursor: pointer;
+}
+
+
+.elf-data {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+
+
+  .elf-bar {
+    display: flex;
+    justify-content: space-between;
+    gap: .5rem;
+
+
+    .elf-filter {
+      width: 300px;
+
+      position: sticky;
+      right: 0;
+    }
+  }
+}
+
+
 .elf-symbols {
-  height: 95dvh;
-  background-color: var(--vscode-sideBarSectionHeader-background);
+  height: 90dvh;
+  background-color: var(--vscode-sideBar-background);
   padding: 1rem;
   border-radius: 10px;
   overflow-y: auto;

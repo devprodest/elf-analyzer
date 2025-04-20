@@ -25,9 +25,10 @@
       {
         "title": "ELF size analyzer",
         "properties": {
-          "devprodest-elf-analyzer.llvm-bin-path": {
+          "devprodest-elf-analyzer.toolchain-nm-bin-path": {
+            "default": "llvm-nm",
             "type": "string",
-            "description": "Path to llvm bin directory"
+            "description": "Path to 'llvm-nm' ar 'gcc-nm' execute file"
           }
         }
       }

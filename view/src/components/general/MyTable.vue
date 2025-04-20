@@ -1,66 +1,91 @@
 <template>
-    <table class="my-table">
-        <thead>
-            <tr class="my-table-header">
-                <th class="my-table-header-cell" :class="head.class" :width="head.width" v-for="head in fields"
+    <div class="my-table">
+        <div class="my-table-column-group">
+            <span class="my-table-column" :class="col.class" :width="col.width" v-for="col in fields" :key="col.key">
+            </span>
+        </div>
+
+        <div class="my-table-header-group">
+            <div class="my-table-row my-table-header-row">
+                <div class="my-table-cell" :class="head.class" v-for="head in fields"
                     :key="head.key" :sort="sortby === head.key" @click="sort(head)">
                     {{ head.title }}
-                </th>
-            </tr>
-        </thead>
+                </div>
+            </div>
+        </div>
 
-        <tbody>
-            <tr class="my-table-row" v-for="(item, i) in items" :key="i" @click.stop.prevent="onRowClick(item)">
-                <td class="my-table-cell" v-for="g in fields" :key="g.key" >
+        <div class="my-table-row-group">
+            <div class="my-table-row" v-for="(item, i) in items" :key="i" @click.stop.prevent="onRowClick(item)">
+                <div class="my-table-cell" v-for="g in fields" :key="g.key" >
                     <slot :name="g.key" :data="item[g.key]" :item="item" :key="item">
                         {{ item[g.key] }}
                     </slot>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 </template>
-
-
-line-height: 22px; background-color: var(--vscode-sideBarSectionHeader-background); border-top: 1px solid var(--vscode-sideBarSectionHeader-border); color: var(--vscode-sideBarSectionHeader-foreground);
-
 
 
 <style lang="scss">
 .my-table {
     width: 100%;
     border-collapse: collapse;
+    display: table;
 
-    td, th {
+    .my-table-column-group {
+        display: table-column-group;
+
+        .my-table-column{
+            display: table-column;
+        }
+    }
+
+    .my-table-cell {
+        display: table-cell;
         padding: .5em;
-    }
-
-    tr {
-        text-align: left;
-    }
-
-    >tbody tr{
-        border-top: 1px solid var(--vscode-sideBarSectionHeader-border);
-    }
-
-    tr:hover {
-        transition: 0.3s;
-        background-color: var(--vscode-list-hoverBackground);
-    }
-
-    .my-table-header th[sort=true] {
-        background-color: var(--vscode-button-background);
+        text-overflow: ellipsis;
+        border-radius: 0 !important;
     }
     
-    .my-table-header{
-        background-color: var(--vscode-sideBarSectionHeader-background);
-        color: var(--vscode-editor-foreground);
-        position: sticky;
-        top: 0;
+    .my-table-row {
+        display: table-row;
+        text-align: left;
+
+        &:hover {
+            transition: 0.3s;
+            background-color: var(--vscode-list-hoverBackground);
+        }
+    }
+    .my-table-row-group{
+        display: table-row-group;
+        overflow-y:scroll;
+
+        .my-table-row {
+            border-top: 1px solid var(--vscode-sideBarSectionHeader-border);
+        }
     }
 
-    .my-table-header {
-        cursor: pointer;
+    .my-table-header-group{
+        display: table-header-group;
+
+        .my-table-header-row{
+            background-color: var(--vscode-list-hoverBackground);
+            color: var(--vscode-editor-foreground);
+            margin: -.5rem;
+            cursor: pointer;
+            position: sticky;
+            top: 0;
+
+            .my-table-cell[sort=true] {
+                font-weight: 400;
+            }
+
+            .my-table-cell[sort=true] {
+                background-color: var(--vscode-button-background);
+                border-radius: 5px;
+            }
+        }
     }
 }
 </style>

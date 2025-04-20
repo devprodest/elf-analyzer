@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { getNonce } from './util';
 import { getElfInfo } from './ElfInformation';
+import { logChannel } from './extension';
 
 
 
@@ -33,18 +34,24 @@ export class ElfEditorProvider implements vscode.CustomReadonlyEditorProvider {
 
         webviewPanel.webview.options = {
             enableScripts: true,
+            enableCommandUris: true,
             localResourceRoots: [assetsPath],
         };
 
-        webviewPanel.webview.onDidReceiveMessage((message) => {
-            console.log(message);
+        webviewPanel.webview.onDidReceiveMessage(async (message) => {
+            logChannel.info("onDidReceiveMessage", message);
+
             switch (message.type) {
                 case 'reopen-as-text':
                     vscode.commands.executeCommand('vscode.openWith', document.uri, 'default', webviewPanel.viewColumn);
                     break;
 
-                case 'getinfo':
+                case 'get-info':
                     updateWebview();
+                    break;
+
+                case 'navigate':
+                    await this.tryOpenFileWithLine(message.value);
                     break;
             }
         }
@@ -53,7 +60,7 @@ export class ElfEditorProvider implements vscode.CustomReadonlyEditorProvider {
         async function updateWebview() {
             webviewPanel.webview.postMessage({
                 type: 'update',
-                text: JSON.stringify(await getElfInfo(document.uri.fsPath)),
+                value: JSON.stringify(await getElfInfo(document.uri.fsPath)),
             });
         }
 
@@ -69,6 +76,24 @@ export class ElfEditorProvider implements vscode.CustomReadonlyEditorProvider {
         await updateWebview();
 
         webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview, assetsPath);
+    }
+
+
+    private async tryOpenFileWithLine(filePath: string) {
+        const fileinfo = filePath.match(/(.*):(\d*)/);
+        const file = fileinfo?.[1].toString() || "";
+        const line: number = Number.parseInt(fileinfo?.[2] || "0");
+
+        logChannel.info("openFileWithLine", file, line);
+
+        const editor = await vscode.window.showTextDocument(vscode.Uri.file(file));
+
+        const gotoPosition = new vscode.Position((line || 1) - 1, 0);
+        editor.selection = new vscode.Selection(gotoPosition, gotoPosition);
+        editor.revealRange(
+            new vscode.Range(gotoPosition, gotoPosition),
+            vscode.TextEditorRevealType.InCenter
+        );
     }
 
 
