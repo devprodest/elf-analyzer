@@ -2,6 +2,7 @@
   "name": "devprodest-elf-analyzer",
   "displayName": "ELF size analyzer",
   "description": "ELF analyzer. List and size of sections and elements.",
+  "publisher": "ZaikinDenis",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.85.0"
