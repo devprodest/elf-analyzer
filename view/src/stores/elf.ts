@@ -5,15 +5,15 @@ import { useEventListener } from '@vueuse/core';
 import {sendMessage} from '../../../common/utils';
 
 
-import einfo from './elfinfo.json';
+// import einfo from './elfinfo.json';
 
 interface onUpdatedInfoCallback { (): void }
 
 
 export const useElfStore = defineStore('elf', () => {
 
-  const info = ref<string>(JSON.stringify(einfo));
-  // const info = ref<string>('{"file":"test.elf","elements":[]}');
+  // const info = ref<string>(JSON.stringify(einfo));
+  const info = ref<string>('{"file":"test.elf","elements":[]}');
 
   const elf = computed<ElfInfo>(() => JSON.parse(info.value));
 
