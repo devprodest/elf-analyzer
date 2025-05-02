@@ -3,6 +3,7 @@
   "displayName": "ELF size analyzer",
   "description": "ELF analyzer. List and size of sections and elements.",
   "publisher": "ZaikinDenis",
+  "icon": "img/icon.png",
   "version": "0.0.2",
   "engines": {
     "vscode": "^1.85.0"
