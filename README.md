@@ -13,3 +13,4 @@ Main functions:
 * Estimating the size of symbols and sections
 
 ![alt text](img/image.png)
+![alt text](img/image2.png)
