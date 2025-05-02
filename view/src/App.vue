@@ -2,8 +2,8 @@
 
   <div class="elf-body" v-if="ready">
     <div class="elf-statistics">
-      <MyDoughnutChart title="ELF section sizes" :data=elfData></MyDoughnutChart>
-      <MyDoughnutChart :title="`Size of ${sectionView} section`" :data=sectionData></MyDoughnutChart>
+      <MyStackChart title="ELF section sizes" :data=elfData @click="sectionUpdate"></MyStackChart>
+      <MyStackChart :title="`Size of ${sectionView} section`" :data=sectionData @click="filterBy"></MyStackChart>
     </div>
 
     <div class="elf-data">
@@ -21,11 +21,11 @@
           @sortchange="sortData">
 
           <template v-slot:address="address">
-            0x{{ address.data.toString(16).padStart(8, '0') }}
+            {{ toHEX(address.data) }}
           </template>
 
           <template v-slot:size="size">
-            {{ toHEX(size.data) }}
+            {{ sizeToHEX(size.data) }}
           </template>
 
           <template v-slot:line="line">
@@ -34,8 +34,9 @@
 
           <template v-slot:section="section">
             <span class="view-section">
-              <span class="view-section-icon"><font-awesome-icon icon="fa-regular fa-eye"
-                  @click="sectionDataUpdate(section.data)" /></span>
+              <span class="view-section-icon">
+                <FontAwesomeIcon icon="fa-regular fa-eye" @click="sectionDataUpdate(section.data)" />
+              </span>
               <span>{{ section.data }}</span>
             </span>
           </template>
@@ -51,15 +52,20 @@
 
 
 <script setup lang="ts">
-import { computed, onMounted, ref, useTemplateRef, watch } from 'vue';
-import { useElfStore } from './stores/elf';
+import { computed, onMounted, ref, useTemplateRef } from 'vue';
 
-import MyTable from './components/general/MyTable.vue';
-import MyButton from './components/general/MyButton.vue';
-import type { MyTableField } from './components/general/MyTable.vue';
 import type { ElfElement } from '../../common/elfInfo';
-import MyDoughnutChart, { type MyDoughnutItem } from './components/general/MyDoughnutChart.vue';
+import MyTable, { type MyTableField } from './components/general/MyTable.vue';
+import MyButton from './components/general/MyButton.vue';
+import MyStackChart, { type MyStackItem } from './components/general/MyStackChart.vue';
 
+import { library } from '@fortawesome/fontawesome-svg-core';
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+import { faEye } from '@fortawesome/free-regular-svg-icons';
+library.add(faEye);
+
+
+import { useElfStore } from './stores/elf';
 const elfStore = useElfStore();
 
 
@@ -79,20 +85,28 @@ const sortBy = ref<string>('name');
 const sortDesc = ref(false);
 const items = ref<Array<ElfElement>>([]);
 
+
+const toHEX = (val: number): string => `0x${val.toString(16).padStart(8, '0')}`;
+
 const radix = ref(false);
-const toHEX = (val: number): string => {
-  if (radix.value) return `0x${val.toString(16).padStart(8, '0')}`
+const sizeToHEX = (val: number): string => {
+  if (radix.value) return toHEX(val);
   return val.toString(10);
 };
 
 const itemsFiltered = computed(() =>
   items.value.filter(x =>
     filter.value?.length > 0
-      ? (x.name?.includes(filter.value) || x.address?.toString().includes(filter.value) || x.size?.toString().includes(filter.value) || x.section?.includes(filter.value) || x.line?.includes(filter.value))
+      ? (
+        x.name?.includes(filter.value) ||
+        toHEX(x.address).includes(filter.value) ||
+        x.size?.toString().includes(filter.value) ||
+        x.section?.includes(filter.value) ||
+        x.line?.includes(filter.value)
+      )
       : true
   )
-)
-
+);
 
 
 const symbols = useTemplateRef("elf-symbols");
@@ -127,39 +141,61 @@ const sortData = async () => {
 
 
 const sectionView = ref<string>('name');
-const sectionData = ref<Array<MyDoughnutItem>>([{ key: "None", data: 0 }]);
-const sectionDataUpdate = (section: string) => {
+const sectionData = ref<Array<MyStackItem>>([{ key: [], data: 0 }]);
+
+const sectionDataUpdate = async (section: string) => {
   sectionView.value = section;
   const data = items.value
     .filter(x => x.section === section)
-    .map(x => ({ key: x.name, data: x.size }))
-    .sort((a, b) => b.data - a.data);
-  sectionData.value = data.splice(0, 10);
+    .sort((a, b) => b.address - a.address)
+    .map(x => ({ key: [x.name], data: x.size, meta: toHEX(x.address) }))
+    .reduce((acc, item) => {
+      let key = item.meta;
+      if (acc[key] === undefined) acc[key] = {
+        data: item.data,
+        key: [...item.key],
+        meta: item.meta,
+      };
+      else acc[key].key.push(...item.key);
+      return acc;
+    }, {} as Record<string, MyStackItem>);
 
-  const other = data.splice(10).reduce((s, x) => s + x.data, 0);
-  if (other < sectionData.value[0].data) { sectionData.value.push({ key: "other", data: other }); }
+  sectionData.value = Object.entries(data).map(([k, v]) => ({ ...v }));
+};
 
+const sectionUpdate = async (section: string) => {
+  filterBy("");
+  sectionDataUpdate(section);
+}
+
+const elfData = ref<Array<MyStackItem>>([{ key: [], data: 0, meta: "" }]);
+
+const elfDataUpdate = async () => {
+  const sections: Record<string, MyStackItem> = items.value
+    .sort((a, b) => b.address - a.address)
+    .map(x => ({ key: [x.section], data: x.size, meta: x.section }))
+    .reduce((acc, item) => {
+      let key = item.meta;
+
+      if (acc[key] === undefined) acc[key] = {
+        data: item.data,
+        key: [...item.key],
+        meta: item.meta,
+      };
+      else acc[key].data = acc[key].data + item.data;
+
+      return acc;
+    }, {} as Record<string, MyStackItem>);
+
+  console.log(sections)
+
+  elfData.value = Object.entries(sections).map(([k, v]) => ({ ...v }));
 };
 
 
-const elfData = ref<Array<MyDoughnutItem>>([{ key: "None", data: 10 }]);
-const elfDataUpdate = () => {
-  const sections: Record<string, number> = items.value.reduce((acc, item) => {
-    let key = item.section;
-    acc[key] = (acc[key] || 0) + item.size;
-    return acc;
-  }, {} as Record<string, number>);
-
-  elfData.value = Object.keys(sections)
-    .map(x => {
-      let key = x;
-      return { key: x, data: sections[key] }
-    }
-    )
-    .sort((a, b) => a.data - b.data)
-    .filter(x => x.data !== 0);
-};
-
+const filterBy = (data: string) => {
+  filter.value = data;
+}
 
 const filenameCut = (filename: string): string => {
   if (filename.length < 48) return filename;
@@ -172,7 +208,7 @@ const refresh = async () => {
   items.value = JSON.parse(elfStore.info).elements;
   sectionDataUpdate(items.value[0].section);
   elfDataUpdate();
-
+  filterBy("");
   ready.value = true;
 }
 
@@ -181,6 +217,9 @@ const refresh = async () => {
 onMounted(async () => {
   await elfStore.updateElfInfo(refresh);
 });
+
+
+
 
 </script>
 
@@ -195,16 +234,14 @@ onMounted(async () => {
 
 .elf-statistics {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 1rem;
+  background-color: var(--vscode-sideBar-background);
+  border-radius: 10px;
+  padding: 1rem;
 
-  >div {
-    display: flex;
-    flex-direction: column;
-    padding: 1rem;
-    background-color: var(--vscode-sideBar-background);
-    border-radius: 10px;
-    align-items: center
+  .my-stack-chart {
+    width: 25px;
   }
 
   .my-chart-title {

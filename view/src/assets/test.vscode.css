@@ -827,3 +827,8 @@
     --vscode-gitlens-launchpadIndicatorAttentionHoverColor: #d8af1b;
     --vscode-testExplorer-errorDecorationBackground: #5a1d1d;
 }
+
+body {
+    color: var(--vscode-editor-foreground);
+    background-color: var(--vscode-editor-background);
+}
