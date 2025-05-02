@@ -2,21 +2,36 @@
 
     <div class="my-stack-wrapper">
         <span class="my-chart-title">
-            {{ props.title }}
+            <slot></slot>
         </span>
 
         <div class="my-stack-chart">
-            <span class="my-stack-item" :light="!!sectionSize" v-for="x, i in sections" :key="i"
+            <VTooltip class="my-stack-item" :light="!!sectionSize" v-for="x, i in sections" :key="i"
                 :style="`height: ${x.size * 95}dvh;`" @click="click(x.meta)">
-            </span>
+
+                <div class="my-stack-item-fill"></div>
+
+                <template #popper>
+                    <div class="my-stack-item-pop">
+                        <div class="my-stack-item-pop-address">{{ x.meta }} </div>
+                        <div class="my-stack-item-pop-size">Size: {{ x.data }} </div>
+                        <div class="my-stack-item-pop-names">
+                            <span v-for="(k, i) in x.key" :key="i">{{ k }}</span>
+                        </div>
+                    </div>
+                </template>
+            </VTooltip>
         </div>
-        
+
     </div>
 
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import FloatingVue from 'floating-vue';
+
+FloatingVue.options.themes.tooltip.placement = 'right';
 
 export type MyStackItem = {
     key: string[];
@@ -33,7 +48,6 @@ type StackItem = {
 
 const props = defineProps<{
     data: Array<MyStackItem>;
-    title?: string;
 }>();
 
 const emit = defineEmits(['click']);
@@ -61,6 +75,21 @@ const sections = computed<Array<StackItem>>(() => {
 </script>
 
 <style lang="scss">
+.my-stack-item-pop {
+    color: var(--vscode-editor-foreground);
+
+    .my-stack-item-pop-names {
+        font-size: 0.8rem;
+        display: grid;
+        grid-template-columns: repeat(4, auto);
+        gap: .25rem;
+        padding: .5rem;
+        background-color: var(--vscode-editor-background);
+        border-radius: 0.5rem;
+        flex-flow: row wrap;
+    }
+}
+
 .my-stack-wrapper {
     display: flex;
     flex-direction: row;
@@ -85,6 +114,11 @@ const sections = computed<Array<StackItem>>(() => {
             filter: brightness(0.2);
         }
 
+        .my-stack-item-fill {
+            width: 100%;
+            height: 100%;
+        }
+
         &[light=true] {
 
             &:hover {
@@ -92,7 +126,6 @@ const sections = computed<Array<StackItem>>(() => {
                 transform: scaleX(1.2);
                 box-shadow: 0rem 0rem 0.5rem;
             }
-
 
             &:nth-child(7n-1) {
                 background-color: #36a2eb;

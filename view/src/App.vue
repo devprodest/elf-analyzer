@@ -2,8 +2,8 @@
 
   <div class="elf-body" v-if="ready">
     <div class="elf-statistics">
-      <MyStackChart title="ELF section sizes" :data=elfData @click="sectionUpdate"></MyStackChart>
-      <MyStackChart :title="`Size of ${sectionView} section`" :data=sectionData @click="filterBy"></MyStackChart>
+      <MyStackChart :data=elfData @click="sectionUpdate">ELF section sizes</MyStackChart>
+      <MyStackChart :data=sectionData @click="filterBy">{{ `Size of ${sectionView} section` }}</MyStackChart>
     </div>
 
     <div class="elf-data">
@@ -203,6 +203,7 @@ const filenameCut = (filename: string): string => {
 };
 
 
+// const ready = ref<boolean>(true);
 const ready = ref<boolean>(false);
 const refresh = async () => {
   items.value = JSON.parse(elfStore.info).elements;

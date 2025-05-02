@@ -23,12 +23,10 @@ export const useElfStore = defineStore('elf', () => {
   async function updateElfInfo(callback: onUpdatedInfoCallback) {
 
     UpdatedInfoCallback.value = callback;
-    // @ts-ignore
     sendMessage({ type: 'get-info' });
   };
 
   async function navigateTo(file: string) {
-    // @ts-ignore
     sendMessage({ type: 'navigate', value: file });
   };
 

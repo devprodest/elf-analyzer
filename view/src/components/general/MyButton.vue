@@ -1,7 +1,7 @@
 <template>
-    <button class="my-button" @click="emit('click')">
-        <slot>Ok</slot>
-    </button>
+  <button class="my-button" @click="emit('click')">
+    <slot>Ok</slot>
+  </button>
 </template>
 
 <script setup lang="ts">
@@ -9,7 +9,7 @@ const emit = defineEmits(['click']);
 </script>
 
 
-<style scoped lang="scss">
+<style lang="scss">
 .my-button {
   padding: .5rem;
   background-color: var(--vscode-button-background);
@@ -23,7 +23,7 @@ const emit = defineEmits(['click']);
   }
 
   &:active {
-        background-color: var(--vscode-button-secondaryBackground);
-    }
+    background-color: var(--vscode-button-secondaryBackground);
+  }
 }
 </style>
