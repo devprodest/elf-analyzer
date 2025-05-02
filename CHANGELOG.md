@@ -3,7 +3,7 @@
 All notable changes to the "devprodest-elf-analyzer" extension will be documented in this file.
 
 
-## 0.0.1
+## 0.0.2
 - Replaced donut chart with stack chart
 - Changed interaction with section charts
 
