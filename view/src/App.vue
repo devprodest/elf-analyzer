@@ -21,7 +21,7 @@
           @sortchange="sortData">
 
           <template v-slot:address="address">
-            {{ toHEX(address.data) }}
+            <pre>{{ toHEX(address.data) }}</pre>
           </template>
 
           <template v-slot:size="size">
@@ -86,12 +86,12 @@ const sortDesc = ref(false);
 const items = ref<Array<ElfElement>>([]);
 
 
-const toHEX = (val: number): string => `0x${val.toString(16).padStart(8, '0')}`;
+const toHEX = (val: number): string => `0x${val?.toString(16).padStart(8, '0')}`;
 
 const radix = ref(false);
 const sizeToHEX = (val: number): string => {
   if (radix.value) return toHEX(val);
-  return val.toString(10);
+  return val?.toString(10) || "";
 };
 
 const itemsFiltered = computed(() =>
