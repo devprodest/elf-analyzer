@@ -26,6 +26,7 @@
         <!-- Левая часть -->
         <div class="elf-bar-left">
           <MyButton @click="reload">Reload</MyButton>
+          <MyButton @click="exportCsv">Export CSV</MyButton>
         </div>
 
         <!-- Центральная часть -->
@@ -104,6 +105,8 @@
 import { computed, onMounted, ref, useTemplateRef, watch } from 'vue';
 
 import type { ElfElement, ElfInfo } from '../../common/elfInfo';
+import { sendMessage } from '../../common/utils';
+
 import MyTable, { type MyTableField, type TableRow } from './components/general/MyTable.vue';
 import MyButton from './components/general/MyButton.vue';
 import MySegmentedControl, { type SegmentedOption } from './components/general/MySegmentedControl.vue';
@@ -438,6 +441,43 @@ const reload = async () => {
   await elfStore.updateElfInfo(refresh);
 };
 
+const exportCsv = () => {
+  // Берем данные, которые сейчас видны на экране (с учетом фильтров)
+  const data = itemsFiltered.value;
+
+  if (data.length === 0) {
+    // Можно показать уведомление, но мы просто ничего не экспортируем
+    return;
+  }
+
+  // Заголовки колонок
+  const headers = ['Name', 'Address', 'Size', 'Section', 'File/Line'];
+
+  // Экранирование значений (если внутри есть кавычки или запятые)
+  const escapeCsv = (val: string | number | undefined) => {
+    if (val === undefined || val === null) return '""';
+    const str = val.toString();
+    if (str.includes('"') || str.includes(',') || str.includes('\n')) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+
+  // Формируем строки
+  const rows = data.map(item => [
+    escapeCsv(item.name),
+    escapeCsv(toHEX(item.address)),
+    escapeCsv(item.size),
+    escapeCsv(item.section),
+    escapeCsv(item.line)
+  ].join(','));
+
+  const csvContent = [headers.join(','), ...rows].join('\n');
+
+  // Отправляем в бэкенд для сохранения
+  sendMessage({ type: 'export-csv', value: csvContent });
+};
+
 onMounted(async () => {
   await elfStore.updateElfInfo(refresh);
 });
@@ -631,19 +671,22 @@ input[type="search"]::-webkit-search-cancel-button {
             cursor: pointer;
             font-size: 0.85rem;
             /* Делаем иконки всегда видимыми (как в VSCode) */
-            color: var(--vscode-editor-foreground); 
-            opacity: 0.7; /* Слегка приглушены, пока не активны */
+            color: var(--vscode-editor-foreground);
+            opacity: 0.7;
+            /* Слегка приглушены, пока не активны */
             transition: all 0.2s;
 
             &:hover {
               background-color: var(--vscode-toolbar-hoverBackground);
-              opacity: 1; /* При наведении становятся яркими */
+              opacity: 1;
+              /* При наведении становятся яркими */
             }
 
             &.active {
               color: var(--vscode-button-foreground);
               background-color: var(--vscode-button-background);
-              opacity: 1; /* Активные всегда яркие */
+              opacity: 1;
+              /* Активные всегда яркие */
             }
           }
         }

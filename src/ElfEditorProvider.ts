@@ -49,6 +49,17 @@ export class ElfEditorProvider implements vscode.CustomReadonlyEditorProvider {
                 case 'navigate':
                     await this.tryOpenFileWithLine(message.value);
                     break;
+                case 'export-csv':
+                    await vscode.window.showSaveDialog({
+                        filters: { 'CSV Files': ['csv'] },
+                        defaultUri: vscode.Uri.file(document.uri.fsPath.replace(/\.elf$/, '.csv'))
+                    }).then(async (uri) => {
+                        if (uri) {
+                            await vscode.workspace.fs.writeFile(uri, Buffer.from(message.value, 'utf-8'));
+                            vscode.window.showInformationMessage('CSV exported successfully!');
+                        }
+                    });
+                    break;
             }
         });
 

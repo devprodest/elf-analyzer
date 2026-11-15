@@ -1,4 +1,4 @@
-export type MessageType = 'get-info' | 'navigate' | 'update';
+export type MessageType = 'get-info' | 'navigate' | 'update' | 'export-csv';
 
 export type MessageBody = {
     type: MessageType;
