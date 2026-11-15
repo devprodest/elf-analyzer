@@ -60,6 +60,20 @@ export class ElfEditorProvider implements vscode.CustomReadonlyEditorProvider {
                         }
                     });
                     break;
+                case 'compare-elf':
+                    const selected = await vscode.window.showOpenDialog({
+                        canSelectFiles: true,
+                        canSelectFolders: false,
+                        filters: { 'ELF Files': ['elf', 'axf', 'out'] }
+                    });
+                    if (selected && selected.length > 0) {
+                        const oldInfo = await getElfInfo(selected[0].fsPath);
+                        webviewPanel.webview.postMessage({
+                            type: 'compare-result',
+                            value: JSON.stringify(oldInfo),
+                        });
+                    }
+                    break;
             }
         });
 

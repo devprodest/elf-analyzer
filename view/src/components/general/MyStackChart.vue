@@ -1,5 +1,4 @@
 <template>
-
     <div class="my-stack-wrapper">
         <span class="my-chart-title">
             <slot></slot>
@@ -7,7 +6,7 @@
 
         <div class="my-stack-chart">
             <VTooltip class="my-stack-item" :light="!!sectionSize" v-for="x, i in sections" :key="i"
-                :style="`height: ${x.size * 95}dvh;`" @click="click(x.meta)">
+                :style="{ height: `${x.size * 100}%` }" @click="click(x.meta)">
 
                 <div class="my-stack-item-fill"></div>
 
@@ -22,9 +21,7 @@
                 </template>
             </VTooltip>
         </div>
-
     </div>
-
 </template>
 
 <script setup lang="ts">
@@ -52,27 +49,21 @@ const props = defineProps<{
 
 const emit = defineEmits(['click']);
 
-
 const click = (data?: string) => {
-    console.log(data)
     emit('click', data);
 }
-
 
 const sectionSize = computed(() => {
     return props.data.reduce((s, x) => s + x.data, 0);
 });
-
-
 
 const sections = computed<Array<StackItem>>(() => {
     const size = sectionSize.value;
     if (size === 0) return [{ ...props.data[0], size: 1 }];
     return props.data.map(x => ({ ...x, size: x.data / size }));
 });
-
-
 </script>
+
 
 <style lang="scss">
 .my-stack-item-pop {
@@ -93,7 +84,9 @@ const sections = computed<Array<StackItem>>(() => {
 .my-stack-wrapper {
     display: flex;
     flex-direction: row;
-    padding-top: 0.5rem;
+    height: 100%;
+    width: 100%;
+    box-sizing: border-box;
 
     .my-chart-title {
         padding: 0.5rem;
@@ -104,13 +97,19 @@ const sections = computed<Array<StackItem>>(() => {
 .my-stack-chart {
     display: flex;
     flex-direction: column;
+    height: 100%;
+    /* Растягиваем на 100% */
+    width: 30px;
 
     .my-stack-item {
         width: 100%;
-        min-height: 3px;
-        /* <--- ДОБАВЛЕНО: чтобы по тонким секциям можно было кликать */
+        min-height: 2px;
         transition: 0.3s;
         background-color: var(--vscode-editor-foreground);
+
+        /* Убираем flex-basis: 0, но добавляем flex-grow: 1 */
+        flex-grow: 1;
+        flex-shrink: 1;
 
         &[light=false] {
             filter: brightness(0.2);
@@ -122,7 +121,6 @@ const sections = computed<Array<StackItem>>(() => {
         }
 
         &[light=true] {
-
             &:hover {
                 filter: saturate(2) brightness(1.2);
                 transform: scaleX(1.2);
@@ -130,7 +128,6 @@ const sections = computed<Array<StackItem>>(() => {
                 z-index: 10;
             }
 
-            /* Используем нативные цвета VSCode */
             &:nth-child(7n-1) {
                 background-color: var(--vscode-charts-blue);
             }
