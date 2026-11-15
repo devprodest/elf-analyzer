@@ -107,6 +107,8 @@ const sections = computed<Array<StackItem>>(() => {
 
     .my-stack-item {
         width: 100%;
+        min-height: 3px;
+        /* <--- ДОБАВЛЕНО: чтобы по тонким секциям можно было кликать */
         transition: 0.3s;
         background-color: var(--vscode-editor-foreground);
 
@@ -122,37 +124,39 @@ const sections = computed<Array<StackItem>>(() => {
         &[light=true] {
 
             &:hover {
-                filter: saturate(3);
+                filter: saturate(2) brightness(1.2);
                 transform: scaleX(1.2);
-                box-shadow: 0rem 0rem 0.5rem;
+                box-shadow: 0rem 0rem 0.5rem rgba(0, 0, 0, 0.5);
+                z-index: 10;
             }
 
+            /* Используем нативные цвета VSCode */
             &:nth-child(7n-1) {
-                background-color: #36a2eb;
+                background-color: var(--vscode-charts-blue);
             }
 
             &:nth-child(7n-2) {
-                background-color: #ff6384;
+                background-color: var(--vscode-charts-red);
             }
 
             &:nth-child(7n-3) {
-                background-color: #4bc0c0;
+                background-color: var(--vscode-charts-green);
             }
 
             &:nth-child(7n-4) {
-                background-color: #ff9f40;
+                background-color: var(--vscode-charts-orange);
             }
 
             &:nth-child(7n-5) {
-                background-color: #9966ff;
+                background-color: var(--vscode-charts-purple);
             }
 
             &:nth-child(7n-6) {
-                background-color: #ffcd56;
+                background-color: var(--vscode-charts-yellow);
             }
 
             &:nth-child(7n-7) {
-                background-color: #c9cbcf;
+                background-color: var(--vscode-descriptionForeground, #999);
             }
         }
     }

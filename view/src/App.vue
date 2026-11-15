@@ -37,7 +37,26 @@
         <div class="elf-bar-right">
           <MySegmentedControl v-model="groupBy" :options="groupByOptions" />
           <MySegmentedControl v-model="radix" :options="radixOptions" />
-          <input type="search" placeholder="Filter" v-model="filter" class="elf-filter vscode-input">
+
+          <!-- Обертка для инпута с иконками -->
+          <div class="elf-search-wrapper">
+            <input type="search" placeholder="Filter" v-model="filter" class="vscode-input">
+
+            <div class="elf-search-actions">
+              <!-- Кнопка Hide 0 -->
+              <div class="elf-search-icon" :class="{ active: hideEmpty }" @click="hideEmpty = !hideEmpty"
+                v-tooltip="'Hide symbols with size 0'">
+                <FontAwesomeIcon :icon="hideEmpty ? faEyeSlash : faEye" />
+              </div>
+
+              <!-- Кнопка Regex -->
+              <div class="elf-search-icon" :class="{ active: useRegex }" @click="useRegex = !useRegex"
+                v-tooltip="'Use Regular Expressions'"
+                style="font-family: var(--vscode-editor-font-family); font-weight: bold; padding-bottom: 2px;">
+                .*
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -60,7 +79,7 @@
           <template v-slot:section="section">
             <span class="view-section">
               <span class="view-section-icon">
-                <FontAwesomeIcon icon="fa-regular fa-eye" @click="sectionDataUpdate(section.data)" />
+                <FontAwesomeIcon :icon="faEye" @click="sectionDataUpdate(section.data)" />
               </span>
               <span>{{ section.data }}</span>
             </span>
@@ -82,18 +101,27 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, useTemplateRef } from 'vue';
+import { computed, onMounted, ref, useTemplateRef, watch } from 'vue';
 
 import type { ElfElement, ElfInfo } from '../../common/elfInfo';
 import MyTable, { type MyTableField, type TableRow } from './components/general/MyTable.vue';
 import MyButton from './components/general/MyButton.vue';
-import MyStackChart, { type MyStackItem } from './components/general/MyStackChart.vue';
 import MySegmentedControl, { type SegmentedOption } from './components/general/MySegmentedControl.vue';
+import MyStackChart, { type MyStackItem } from './components/general/MyStackChart.vue';
 
-import { library } from '@fortawesome/fontawesome-svg-core';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { faEye } from '@fortawesome/free-regular-svg-icons';
-library.add(faEye);
+import { faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
+
+// --- СОХРАНЕНИЕ СОСТОЯНИЯ ---
+const getState = <T,>(): T | undefined => {
+  // @ts-ignore
+  return vscode.getState() as T | undefined;
+};
+
+const setState = (state: any) => {
+  // @ts-ignore
+  vscode.setState(state);
+};
 
 import { useElfStore } from './stores/elf';
 const elfStore = useElfStore();
@@ -106,27 +134,59 @@ const fields: MyTableField[] = [
   { sortable: true, class: "", key: "line", title: "File" },
 ];
 
-const filter = ref<string>("");
-const sortBy = ref<string>('name');
-const sortDesc = ref(false);
-const items = ref<Array<ElfElement>>([]);
+// Загружаем сохраненное состояние или берем дефолт
+const defaultState = {
+  filter: "",
+  sortBy: "name",
+  sortDesc: false,
+  groupBy: "none",
+  radix: "dec",
+  collapsedGroups: [] as string[],
+  hideEmpty: false,
+  useRegex: false,
+};
 
-const radix = ref<string>('dec');
-const radixOptions: SegmentedOption[] = [
-  { value: 'dec', label: 'Dec' },
-  { value: 'hex', label: 'Hex' },
-];
+const savedState = getState<typeof defaultState>() || defaultState;
 
-// --- ГРУППИРОВКА ---
-const collapsedGroups = ref<Set<string>>(new Set());
+const filter = ref<string>(savedState.filter);
+const hideEmpty = ref<boolean>(savedState.hideEmpty);
+const useRegex = ref<boolean>(savedState.useRegex);
+const sortBy = ref<string>(savedState.sortBy);
+const sortDesc = ref<boolean>(savedState.sortDesc);
+const groupBy = ref<string>(savedState.groupBy);
+const radix = ref<string>(savedState.radix);
+const collapsedGroups = ref<Set<string>>(new Set(savedState.collapsedGroups));
 
-const groupBy = ref<string>('none');
+// Автоматически сохраняем при любом изменении
+const saveState = () => {
+  setState({
+    filter: filter.value,
+    sortBy: sortBy.value,
+    sortDesc: sortDesc.value,
+    groupBy: groupBy.value,
+    radix: radix.value,
+    collapsedGroups: Array.from(collapsedGroups.value),
+    hideEmpty: hideEmpty.value,
+    useRegex: useRegex.value,
+  });
+};
+
+// Следим за изменениями явно (для Set нужен deep: true или триггер через замену ссылки)
+watch([filter, sortBy, sortDesc, groupBy, radix, hideEmpty, useRegex], saveState);
+watch(collapsedGroups, saveState, { deep: true });
 
 const groupByOptions: SegmentedOption[] = [
   { value: 'none', label: 'None' },
   { value: 'section', label: 'Section' },
   { value: 'file', label: 'File' },
 ];
+
+const radixOptions: SegmentedOption[] = [
+  { value: 'dec', label: 'Dec' },
+  { value: 'hex', label: 'Hex' },
+];
+
+const items = ref<Array<ElfElement>>([]);
 
 const toggleGroup = (key: string) => {
   if (collapsedGroups.value.has(key)) {
@@ -148,15 +208,41 @@ const sizeToHexOrDec = (val: number | undefined | null): string => {
 };
 
 const itemsFiltered = computed(() => {
-  const q = filter.value.trim().toLowerCase();
-  if (!q) return items.value;
+  let result = items.value;
 
-  return items.value.filter(x =>
-    x.name?.toLowerCase().includes(q) ||
-    toHEX(x.address).toLowerCase().includes(q) ||
-    x.size?.toString().includes(q) ||
-    x.section?.toLowerCase().includes(q) ||
-    x.line?.toLowerCase().includes(q)
+  // 1. Скрываем пустые символы
+  if (hideEmpty.value) {
+    result = result.filter(x => x.size > 0);
+  }
+
+  // 2. Применяем текстовый фильтр
+  const q = filter.value.trim();
+  if (!q) return result;
+
+  if (useRegex.value) {
+    try {
+      const re = new RegExp(q, 'i'); // 'i' = case-insensitive
+      return result.filter(x =>
+        re.test(x.name) ||
+        re.test(toHEX(x.address)) ||
+        re.test(x.size?.toString() || "") ||
+        re.test(x.section) ||
+        re.test(x.line || "")
+      );
+    } catch (e) {
+      // Если регулярка битая (например, незакрытая скобка), возвращаем всё или пустоту
+      return []; // Лучше вернуть пустоту, чтобы пользователь понял, что ошибка
+    }
+  }
+
+  // Обычный поиск (case-insensitive)
+  const qLower = q.toLowerCase();
+  return result.filter(x =>
+    x.name?.toLowerCase().includes(qLower) ||
+    toHEX(x.address).toLowerCase().includes(qLower) ||
+    x.size?.toString().includes(qLower) ||
+    x.section?.toLowerCase().includes(qLower) ||
+    x.line?.toLowerCase().includes(qLower)
   );
 });
 
@@ -338,9 +424,8 @@ const refresh = async () => {
       sectionDataUpdate(items.value[0]?.section ?? "");
     }
     elfDataUpdate();
-    filterBy("");
     ready.value = true;
-    sortData();
+    sortData(); // Применяем загруженную сортировку
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
     ready.value = false;
@@ -359,6 +444,12 @@ onMounted(async () => {
 </script>
 
 <style lang="scss">
+/* Скрываем нативную кнопку очистки в поисковом инпуте */
+input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 .elf-body {
   width: 100%;
   display: flex;
@@ -502,6 +593,61 @@ onMounted(async () => {
 
     .elf-bar-right {
       justify-content: flex-end;
+
+      .elf-search-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+        width: 300px;
+        margin-left: 0.5rem;
+
+        input.vscode-input {
+          width: 100%;
+          padding-right: 60px;
+          /* Оставляем место для иконок */
+        }
+
+        .elf-search-actions {
+          position: absolute;
+          right: 4px;
+          top: 50%;
+          transform: translateY(-50%);
+          /* Точное центрирование по вертикали */
+          display: flex;
+          gap: 4px;
+          height: 100%;
+          align-items: center;
+          pointer-events: none;
+          /* Чтобы клики проходили только по иконкам */
+
+          .elf-search-icon {
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            /* Делаем иконки всегда видимыми (как в VSCode) */
+            color: var(--vscode-editor-foreground); 
+            opacity: 0.7; /* Слегка приглушены, пока не активны */
+            transition: all 0.2s;
+
+            &:hover {
+              background-color: var(--vscode-toolbar-hoverBackground);
+              opacity: 1; /* При наведении становятся яркими */
+            }
+
+            &.active {
+              color: var(--vscode-button-foreground);
+              background-color: var(--vscode-button-background);
+              opacity: 1; /* Активные всегда яркие */
+            }
+          }
+        }
+      }
     }
 
     .elf-bar-center {
