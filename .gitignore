@@ -5,3 +5,4 @@ node_modules
 *.vsix
 view-dist/*
 view-dist/assets/*
+debug_data/*.elf

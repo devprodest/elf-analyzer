@@ -14,4 +14,5 @@ export type ElfElement = {
 export type ElfInfo = {
     file: string,
     elements: ElfElement[],
+    error?: string,
 }

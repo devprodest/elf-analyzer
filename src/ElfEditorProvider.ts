@@ -28,7 +28,6 @@ export class ElfEditorProvider implements vscode.CustomReadonlyEditorProvider {
         };
     }
 
-
     public async resolveCustomEditor(document: vscode.CustomDocument, webviewPanel: vscode.WebviewPanel, token: vscode.CancellationToken): Promise<void> {
         const assetsPath = vscode.Uri.joinPath(this.context.extensionUri, 'view-dist', 'assets');
 
@@ -40,22 +39,18 @@ export class ElfEditorProvider implements vscode.CustomReadonlyEditorProvider {
 
         webviewPanel.webview.onDidReceiveMessage(async (message) => {
             logChannel.info("onDidReceiveMessage", message);
-
             switch (message.type) {
                 case 'reopen-as-text':
                     vscode.commands.executeCommand('vscode.openWith', document.uri, 'default', webviewPanel.viewColumn);
                     break;
-
                 case 'get-info':
                     updateWebview();
                     break;
-
                 case 'navigate':
                     await this.tryOpenFileWithLine(message.value);
                     break;
             }
-        }
-        );
+        });
 
         async function updateWebview() {
             webviewPanel.webview.postMessage({
@@ -69,13 +64,48 @@ export class ElfEditorProvider implements vscode.CustomReadonlyEditorProvider {
                 updateWebview();
             }
         });
+
+        // --- НОВОЕ: Следим за пересборкой фронтенда ---
+        const updateHtml = () => {
+            webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview, assetsPath);
+        };
+
+        updateHtml(); // Устанавливаем HTML
+
+        const watcher = vscode.workspace.createFileSystemWatcher(
+            new vscode.RelativePattern(this.context.extensionUri, 'view-dist/**/*')
+        );
+        watcher.onDidChange(updateHtml);
+        watcher.onDidCreate(updateHtml);
+
         webviewPanel.onDidDispose(() => {
             changeDocumentSubscription.dispose();
+            watcher.dispose();
         });
 
+        // Вызываем после того, как HTML установлен
         await updateWebview();
+    }
 
-        webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview, assetsPath);
+    getHtmlForWebview(webview: vscode.Webview, assetsPath: vscode.Uri): string {
+        const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(assetsPath, 'index.js'));
+        const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(assetsPath, 'index.css'));
+        const nonce = getNonce();
+
+        return /* html */ `<!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} data:;">
+            <link href="${styleUri}" rel="stylesheet" />
+        </head>
+        <body>
+            <div id="app"></div>
+            <script nonce="${nonce}">const vscode = acquireVsCodeApi();</script>
+            <script type="module" nonce="${nonce}" src="${scriptUri}"></script>
+        </body>
+        </html>`;
     }
 
 
@@ -95,14 +125,4 @@ export class ElfEditorProvider implements vscode.CustomReadonlyEditorProvider {
             vscode.TextEditorRevealType.InCenter
         );
     }
-
-
-    getHtmlForWebview(webview: vscode.Webview, assetsPath: vscode.Uri): string {
-        const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(assetsPath, 'index.js'));
-        const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(assetsPath, 'index.css'));
-        const nonce = getNonce();
-
-        return /* html */ `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><link href="${styleUri}" rel="stylesheet" /><script>const vscode = acquireVsCodeApi();</script></head><body><div id="app"></div><script type="module" src="${scriptUri}"></script></body></html>`;
-    }
-
 }

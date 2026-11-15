@@ -1,10 +1,87 @@
 {
     "folders": [
         {
-            "path": "."
+            "name": "view",
+            "path": "view"
         },
         {
-            "path": "./view"
+            "name": "devprodest-elf-analyzer",
+            "path": "."
         }
-    ]
+    ],
+    "tasks": {
+        "version": "2.0.0",
+        "tasks": [
+            {
+                "label": "watch:backend",
+                "type": "shell",
+                "command": "npm run watch:esbuild",
+                "options": {
+                    "cwd": "${workspaceFolder:devprodest-elf-analyzer}"
+                },
+                "isBackground": true,
+                "problemMatcher": {
+                    "owner": "esbuild",
+                    "pattern": {
+                        "regexp": "✘ \\[ERROR\\] (.*)",
+                        "file": 1,
+                        "location": 2,
+                        "message": 3
+                    },
+                    "background": {
+                        "activeOnStart": true,
+                        "beginsPattern": "\\[watch\\] build started",
+                        "endsPattern": "\\[watch\\] build finished"
+                    }
+                }
+            },
+            {
+                "label": "watch:frontend",
+                "type": "shell",
+                "command": "npm run watch",
+                "options": {
+                    "cwd": "${workspaceFolder:view}"
+                },
+                "isBackground": true,
+                "problemMatcher": {
+                    "owner": "vite",
+                    "pattern": {
+                        "regexp": "Error: (.*)",
+                        "message": 1
+                    },
+                    "background": {
+                        "activeOnStart": true,
+                        "beginsPattern": "building for production",
+                        "endsPattern": "built in"
+                    }
+                }
+            },
+            {
+                "label": "dev:all",
+                "dependsOn": [
+                    "watch:backend",
+                    "watch:frontend"
+                ],
+                "dependsOrder": "parallel",
+                "problemMatcher": []
+            }
+        ]
+    },
+    "launch": {
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "name": "Запуск расширения (F5)",
+                "type": "extensionHost",
+                "request": "launch",
+                "args": [
+                    "--extensionDevelopmentPath=${workspaceFolder:devprodest-elf-analyzer}"
+                ],
+                "outFiles": [
+                    "${workspaceFolder:devprodest-elf-analyzer}/dist/**/*.js"
+                ],
+                "preLaunchTask": "dev:all"
+            }
+        ]
+    }
 }
