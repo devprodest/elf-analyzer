@@ -1,6 +1,6 @@
-[![](https://vsmarketplacebadges.dev/version-short/ZaikinDenis.devprodest-elf-analyzer.svg)](https://marketplace.visualstudio.com/items?itemName=ZaikinDenis.devprodest-elf-analyzer)
-[![](https://vsmarketplacebadges.dev/downloads-short/ZaikinDenis.devprodest-elf-analyzer.svg)](https://marketplace.visualstudio.com/items?itemName=ZaikinDenis.devprodest-elf-analyzer)
-[![](https://vsmarketplacebadges.dev/rating-short/ZaikinDenis.devprodest-elf-analyzer.svg)](https://marketplace.visualstudio.com/items?itemName=ZaikinDenis.devprodest-elf-analyzer)
+[![](https://vsmarketplacebadges.dev/version-short/ZaikinDenis.devprodest-elf-analyzer.png)](https://marketplace.visualstudio.com/items?itemName=ZaikinDenis.devprodest-elf-analyzer)
+[![](https://vsmarketplacebadges.dev/downloads-short/ZaikinDenis.devprodest-elf-analyzer.png)](https://marketplace.visualstudio.com/items?itemName=ZaikinDenis.devprodest-elf-analyzer)
+[![](https://vsmarketplacebadges.dev/rating-short/ZaikinDenis.devprodest-elf-analyzer.png)](https://marketplace.visualstudio.com/items?itemName=ZaikinDenis.devprodest-elf-analyzer)
 
 # ELF Analyzer
 
