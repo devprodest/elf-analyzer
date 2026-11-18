@@ -22,15 +22,15 @@
           <FontAwesomeIcon :icon="allGroupsCollapsed ? faAnglesDown : faAnglesUp" />
         </MyButton>
         <MySegmentedControl v-model="typeFilter" :options="typeOptions" />
+        <MyButton @click="hideEmpty = !hideEmpty"
+          v-tooltip="hideEmpty ? 'Show symbols with size 0' : 'Hide symbols with size 0'" :active="hideEmpty">
+          <FontAwesomeIcon :icon="hideEmpty ? faEyeSlash : faEye" />
+        </MyButton>
         <MySegmentedControl v-model="radix" :options="radixOptions" />
 
         <div class="elf-search-wrapper">
           <input type="search" placeholder="Filter" v-model="filter" class="vscode-input">
           <div class="elf-search-actions">
-            <div class="elf-search-icon" :class="{ active: hideEmpty }" @click="hideEmpty = !hideEmpty"
-              v-tooltip="'Hide symbols with size 0'">
-              <FontAwesomeIcon :icon="hideEmpty ? faEyeSlash : faEye" />
-            </div>
             <div class="elf-search-icon" :class="{ active: useRegex }" @click="useRegex = !useRegex"
               v-tooltip="'Use Regular Expressions'">
               <FontAwesomeIcon :icon="faCode" />
@@ -739,7 +739,7 @@ onMounted(async () => {
 
     input.vscode-input {
       width: 100%;
-      padding-right: 60px;
+      padding-right: 40px;
     }
 
     .elf-search-actions {
