@@ -17,6 +17,7 @@
 
       <div class="elf-bar-right">
         <MySegmentedControl v-model="groupBy" :options="groupByOptions" />
+        <MySegmentedControl v-model="typeFilter" :options="typeOptions" />
         <MySegmentedControl v-model="radix" :options="radixOptions" />
 
         <div class="elf-search-wrapper">
@@ -181,6 +182,7 @@ const defaultState = {
   sortDesc: false,
   groupBy: "none",
   radix: "dec",
+  typeFilter: "all",
   collapsedGroups: [] as string[],
   hideEmpty: false,
   useRegex: false,
@@ -188,7 +190,9 @@ const defaultState = {
 
 const savedState = getState<typeof defaultState>() || defaultState;
 
+
 const filter = ref<string>(savedState.filter);
+const typeFilter = ref<string>(savedState.typeFilter);
 const sortBy = ref<string>(savedState.sortBy);
 const sortDesc = ref<boolean>(savedState.sortDesc);
 const groupBy = ref<string>(savedState.groupBy);
@@ -204,14 +208,23 @@ const saveState = () => {
     sortDesc: sortDesc.value,
     groupBy: groupBy.value,
     radix: radix.value,
+    typeFilter: typeFilter.value,
     collapsedGroups: Array.from(collapsedGroups.value),
     hideEmpty: hideEmpty.value,
     useRegex: useRegex.value,
   });
 };
 
-watch([filter, sortBy, sortDesc, groupBy, radix, hideEmpty, useRegex], saveState);
+watch([filter, sortBy, sortDesc, groupBy, radix, typeFilter, hideEmpty, useRegex], saveState);
 watch(collapsedGroups, saveState, { deep: true });
+
+
+const typeOptions: SegmentedOption[] = [
+  { value: 'all', label: 'All' },
+  { value: 'func', label: 'Func' },
+  { value: 'object', label: 'Obj' },
+  { value: 'other', label: 'Other' },
+];
 
 const groupByOptions: SegmentedOption[] = [
   { value: 'none', label: 'None' },
@@ -250,6 +263,16 @@ const itemsFiltered = computed(() => {
 
   if (hideEmpty.value) {
     result = result.filter(x => x.size > 0);
+  }
+
+  if (typeFilter.value !== 'all') {
+    result = result.filter(x => {
+      const type = x.type?.toUpperCase() || '';
+      if (typeFilter.value === 'func') return type === 'FUNC';
+      if (typeFilter.value === 'object') return type === 'OBJECT';
+      if (typeFilter.value === 'other') return type !== 'FUNC' && type !== 'OBJECT';
+      return true;
+    });
   }
 
   const q = filter.value.trim();
