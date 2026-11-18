@@ -17,6 +17,10 @@
 
       <div class="elf-bar-right">
         <MySegmentedControl v-model="groupBy" :options="groupByOptions" />
+        <MyButton v-if="groupBy !== 'none'" @click="toggleAllGroups"
+          v-tooltip="allGroupsCollapsed ? 'Expand All' : 'Collapse All'">
+          <FontAwesomeIcon :icon="allGroupsCollapsed ? faAnglesDown : faAnglesUp" />
+        </MyButton>
         <MySegmentedControl v-model="typeFilter" :options="typeOptions" />
         <MySegmentedControl v-model="radix" :options="radixOptions" />
 
@@ -153,7 +157,7 @@ import MyStackChart, { type MyStackItem } from './components/general/MyStackChar
 import { sendMessage } from '../../common/utils';
 
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { faEye, faEyeSlash, faCode } from '@fortawesome/free-solid-svg-icons';
+import { faEye, faEyeSlash, faCode, faAnglesDown, faAnglesUp } from '@fortawesome/free-solid-svg-icons';
 
 const getState = <T,>(): T | undefined => {
   // @ts-ignore
@@ -245,6 +249,48 @@ const toggleGroup = (key: string) => {
   } else {
     collapsedGroups.value.add(key);
   }
+  collapsedGroups.value = new Set(collapsedGroups.value);
+};
+
+// Проверяем, все ли группы сейчас свернуты
+const allGroupsCollapsed = computed(() => {
+  if (groupBy.value === 'none') return false;
+
+  // Получаем список уникальных ключей групп
+  const groups = new Set<string>();
+  for (const item of itemsFiltered.value) {
+    if (groupBy.value === 'section') groups.add(item.section || "(no section)");
+    else if (groupBy.value === 'file') {
+      const match = item.line?.match(/(.*):\d+$/);
+      groups.add(match ? match[1] : (item.line || "(no file)"));
+    }
+  }
+
+  // Если все группы есть в collapsedGroups, значит они все свернуты
+  return groups.size > 0 && Array.from(groups).every(k => collapsedGroups.value.has(k));
+});
+
+// Сворачиваем или разворачиваем всё
+const toggleAllGroups = () => {
+  if (groupBy.value === 'none') return;
+
+  if (allGroupsCollapsed.value) {
+    // Разворачиваем всё
+    collapsedGroups.value.clear();
+  } else {
+    // Сворачиваем всё
+    for (const item of itemsFiltered.value) {
+      let key = "";
+      if (groupBy.value === 'section') {
+        key = item.section || "(no section)";
+      } else if (groupBy.value === 'file') {
+        const match = item.line?.match(/(.*):\d+$/);
+        key = match ? match[1] : (item.line || "(no file)");
+      }
+      collapsedGroups.value.add(key);
+    }
+  }
+  // Триггерим реактивность для Set
   collapsedGroups.value = new Set(collapsedGroups.value);
 };
 
@@ -677,7 +723,11 @@ onMounted(async () => {
     align-items: center;
     gap: 0.5rem;
     flex-shrink: 0;
-    /* Запрещаем правой части сжиматься и уезжать */
+
+    .my-button {
+      padding: 0.4rem 0.6rem;
+      font-size: 0.85rem;
+    }
   }
 
   .elf-search-wrapper {
