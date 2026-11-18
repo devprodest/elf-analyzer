@@ -11,12 +11,13 @@ A powerful extension for getting detailed information about ELF files directly i
 * **Symbol Information**: View names, addresses, sizes, and sections of all symbols.
 * **Interactive Charts**: Visualize section sizes and symbol distribution with stack charts.
 * **Grouping**: Group symbols by Section or File to see where the size is coming from.
-* **Top 15 Symbols**: Instantly see the largest symbols in your binary. Click to filter the table.
-* **Diff & Compare**: Compare your current build against a previous file to see exactly what grew or shrank.
+* **Top 15 Symbols**: Instantly see the largest symbols in your binary (globally or filtered by section). Click to filter the table.
+* **Type Filters**: Quickly filter symbols by their type (Func, Obj, Other).
+* **Diff & Compare**: Compare your current build against a previous binary file to see exactly what grew or shrank.
 * **Export to CSV**: Export your filtered data or diff results to a CSV file for reporting.
 * **Advanced Search**: Use case-insensitive search, Regular Expressions, and hide empty symbols.
 * **Hex/Dec Toggle**: Switch between decimal and hexadecimal views for sizes.
-* **State Persistence**: Your filters, sorting, and grouping settings are saved automatically.
+* **State Persistence**: Your filters, sorting, grouping, and collapsed states are saved automatically.
 
 ## Supported Formats
 
@@ -29,6 +30,15 @@ A powerful extension for getting detailed information about ELF files directly i
 This extension contributes the following settings:
 
 * `devprodest-elf-analyzer.toolchain-nm-bin-path`: Path to the `llvm-nm` or `gcc-nm` executable (default is `llvm-nm`).
+
+## 📦 Installation
+
+If you are installing the extension manually from the GitHub Releases page:
+1. Download the `devprodest-elf-analyzer-0.2.0.vsix` file from the assets.
+2. Open VS Code.
+3. Go to the Extensions view (`Ctrl+Shift+X`).
+4. Click the `...` (More Actions) button in the top-right corner and select **Install from VSIX...**.
+5. Select the downloaded `.vsix` file.
 
 ## Usage
 

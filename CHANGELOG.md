@@ -1,6 +1,19 @@
-# Change Log
-
 All notable changes to the "devprodest-elf-analyzer" extension will be documented in this file.
+
+
+## 0.2.0
+
+### 🚀 New Features
+- **Top 15 by Section**: The Top-15 panel now dynamically filters to show the largest symbols of the currently selected section.
+- **Type Filters**: Added quick segmented controls to filter symbols by type (All, Func, Obj, Other).
+- **Collapse/Expand All**: Added a toggle button in the toolbar to collapse or expand all table groups at once.
+- **Toolbar Redesign**: Moved the "Hide size=0" toggle out of the search bar into the main toolbar and replaced text buttons with icons for a cleaner look.
+
+### 🛠️ UI/UX Improvements
+- Optimized all CSS styles, replacing hardcoded pixels with `rem` units for better scaling.
+- Unified button sizes and icon usage across the toolbar, Diff modal, and error screens.
+- Added state persistence for the type filter.
+- Added active visual states for toggle buttons.
 
 
 ## 0.1.0
