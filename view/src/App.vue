@@ -5,9 +5,15 @@
     <!-- ВЕРХНИЙ ТУЛБАР (на всю ширину) -->
     <div class="elf-bar">
       <div class="elf-bar-left">
-        <MyButton @click="reload">Reload</MyButton>
-        <MyButton @click="exportCsv">Export CSV</MyButton>
-        <MyButton @click="startCompare">Compare</MyButton>
+        <MyButton @click="reload" v-tooltip="'Reload ELF info'">
+          <FontAwesomeIcon :icon="faRotateRight" /><span>RELOAD</span>
+        </MyButton>
+        <MyButton @click="exportCsv" v-tooltip="'Export filtered table to CSV'">
+          <FontAwesomeIcon :icon="faFileCsv" />
+        </MyButton>
+        <MyButton @click="startCompare" v-tooltip="'Compare with another ELF file'">
+          <FontAwesomeIcon :icon="faCodeCompare" />
+        </MyButton>
       </div>
 
       <div class="elf-bar-center">
@@ -16,17 +22,18 @@
       </div>
 
       <div class="elf-bar-right">
-        <MySegmentedControl v-model="groupBy" :options="groupByOptions" />
         <MyButton v-if="groupBy !== 'none'" @click="toggleAllGroups"
           v-tooltip="allGroupsCollapsed ? 'Expand All' : 'Collapse All'">
           <FontAwesomeIcon :icon="allGroupsCollapsed ? faAnglesDown : faAnglesUp" />
         </MyButton>
+        <MySegmentedControl v-model="groupBy" :options="groupByOptions" />
         <MySegmentedControl v-model="typeFilter" :options="typeOptions" />
+        <MySegmentedControl v-model="radix" :options="radixOptions" />
+
         <MyButton @click="hideEmpty = !hideEmpty"
           v-tooltip="hideEmpty ? 'Show symbols with size 0' : 'Hide symbols with size 0'" :active="hideEmpty">
           <FontAwesomeIcon :icon="hideEmpty ? faEyeSlash : faEye" />
         </MyButton>
-        <MySegmentedControl v-model="radix" :options="radixOptions" />
 
         <div class="elf-search-wrapper">
           <input type="search" placeholder="Filter" v-model="filter" class="vscode-input">
@@ -53,7 +60,7 @@
           <div class="elf-stats-block elf-top-symbols">
             <div class="elf-stats-title">
               Top 15 Symbols
-              <span v-if="selectedSection" class="elf-top-section-name">({{ selectedSection  }})</span>
+              <span v-if="selectedSection" class="elf-top-section-name">({{ selectedSection }})</span>
             </div>
             <div class="elf-top-symbol-row" v-for="sym in topSymbols" :key="sym.address" @click="filter = sym.name"
               title="Click to filter">
@@ -99,7 +106,9 @@
     <div>
       <p><strong>Failed to load ELF info</strong></p>
       <pre class="elf-error-message">{{ error }}</pre>
-      <MyButton @click="reload">Retry</MyButton>
+      <MyButton @click="reload" v-tooltip="'Retry'">
+        <FontAwesomeIcon :icon="faRotate" /> RELOAD
+      </MyButton>
     </div>
   </div>
 
@@ -111,9 +120,15 @@
       <div class="elf-modal-header">
         <h3>Diff Result</h3>
         <div class="elf-modal-actions">
-          <MyButton @click="copyDiffToClipboard">Copy</MyButton>
-          <MyButton @click="exportDiffCsv">Export CSV</MyButton>
-          <MyButton @click="diffData = null">Close</MyButton>
+          <MyButton @click="copyDiffToClipboard" v-tooltip="'Copy to Clipboard'">
+            <FontAwesomeIcon :icon="faCopy" />
+          </MyButton>
+          <MyButton @click="exportDiffCsv" v-tooltip="'Export to CSV'">
+            <FontAwesomeIcon :icon="faFileCsv" />
+          </MyButton>
+          <MyButton @click="diffData = null" v-tooltip="'Close'">
+            <FontAwesomeIcon :icon="faXmark" />
+          </MyButton>
         </div>
       </div>
 
@@ -160,7 +175,7 @@ import MyStackChart, { type MyStackItem } from './components/general/MyStackChar
 import { sendMessage } from '../../common/utils';
 
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { faEye, faEyeSlash, faCode, faAnglesDown, faAnglesUp } from '@fortawesome/free-solid-svg-icons';
+import { faEye, faEyeSlash, faCode, faAnglesDown, faAnglesUp, faRotateRight, faFileCsv, faCodeCompare, faCopy, faXmark, faRotate, faList, faFolderTree, faFileCode, faCubes, faSquareRootVariable, faDatabase, faQuestion, fa1, faHashtag } from '@fortawesome/free-solid-svg-icons';
 
 const getState = <T,>(): T | undefined => {
   // @ts-ignore
@@ -226,22 +241,22 @@ watch([filter, sortBy, sortDesc, groupBy, radix, typeFilter, hideEmpty, useRegex
 watch(collapsedGroups, saveState, { deep: true });
 
 
-const typeOptions: SegmentedOption[] = [
-  { value: 'all', label: 'All' },
-  { value: 'func', label: 'Func' },
-  { value: 'object', label: 'Obj' },
-  { value: 'other', label: 'Other' },
+const groupByOptions: SegmentedOption[] = [
+  { value: 'none', label: "NONE", tooltip: 'None' },
+  { value: 'section', label: "SECTION", tooltip: 'Group by Section' },
+  { value: 'file', label: "FILE", tooltip: 'Group by File' },
 ];
 
-const groupByOptions: SegmentedOption[] = [
-  { value: 'none', label: 'None' },
-  { value: 'section', label: 'Section' },
-  { value: 'file', label: 'File' },
+const typeOptions: SegmentedOption[] = [
+  { value: 'all', label: "ALL", tooltip: 'All Types' },
+  { value: 'func', label: "FUNC", tooltip: 'Functions only' },
+  { value: 'object', label: "OBJ", tooltip: 'Objects only' },
+  { value: 'other', label: "OTHER", tooltip: 'Other types' },
 ];
 
 const radixOptions: SegmentedOption[] = [
-  { value: 'dec', label: 'Dec' },
-  { value: 'hex', label: 'Hex' },
+  { value: 'dec', label: "10", tooltip: 'Decimal' },
+  { value: 'hex', label: "0x", tooltip: 'Hexadecimal' },
 ];
 
 const items = ref<Array<ElfElement>>([]);
@@ -367,7 +382,7 @@ const formatBytes = (bytes: number): string => {
 // Топ-15 символов (зависит от выбранной секции)
 const topSymbols = computed(() => {
   let sourceItems = itemsFiltered.value;
-  
+
   // Фильтруем только если выбрана конкретная секция
   if (selectedSection.value) {
     sourceItems = sourceItems.filter(x => x.section === selectedSection.value);
@@ -479,7 +494,7 @@ const sectionDataUpdate = async (section: string) => {
 
 const sectionUpdate = async (section: string) => {
   filterBy("");
-  selectedSection.value = ''; 
+  selectedSection.value = '';
   sectionView.value = section; // Устанавливаем выбранную секцию
   sectionDataUpdate(section);
 };
@@ -706,9 +721,7 @@ onMounted(async () => {
   white-space: nowrap;
   flex-shrink: 0;
   padding-bottom: 0.5rem;
-  /* Только нижний отступ */
   border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border);
-  /* Убрали background-color и border-radius */
 
   .elf-bar-left {
     display: flex;
@@ -722,7 +735,6 @@ onMounted(async () => {
     justify-content: center;
     white-space: nowrap;
     flex: 1;
-    /* Центр тянется, чтобы раздвинуть левую и правую части */
 
     @media (max-width: 1100px) {
       display: none !important;
@@ -753,21 +765,21 @@ onMounted(async () => {
     position: relative;
     display: flex;
     align-items: center;
-    width: 250px;
+    width: 16rem; /* 256px */
     flex-shrink: 0;
 
     input.vscode-input {
       width: 100%;
-      padding-right: 40px;
+      padding-right: 2.5rem;
     }
 
     .elf-search-actions {
       position: absolute;
-      right: 6px;
+      right: 0.4rem;
       top: 50%;
       transform: translateY(-50%);
       display: flex;
-      gap: 6px;
+      gap: 0.4rem;
       align-items: center;
       pointer-events: none;
 
@@ -776,10 +788,9 @@ onMounted(async () => {
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 22px;
-        height: 22px;
-        border-radius: 3px;
-        cursor: pointer;
+        width: 1.4rem; /* 22px */
+        height: 1.4rem;
+        border-radius: 0.2rem;
         font-size: 0.85rem;
         color: var(--vscode-editor-foreground);
         opacity: 0.7;
@@ -807,7 +818,6 @@ onMounted(async () => {
   flex-direction: row;
   gap: 1rem;
   min-height: 0;
-  /* Важно! Позволяет контенту сжиматься */
   overflow: hidden;
 }
 
@@ -817,7 +827,7 @@ onMounted(async () => {
   flex-direction: row;
   gap: 1rem;
   background-color: var(--vscode-sideBar-background);
-  border-radius: 10px;
+  border-radius: 0.6rem;
   padding: 1rem;
   height: 100%;
   box-sizing: border-box;
@@ -840,7 +850,7 @@ onMounted(async () => {
     gap: 1rem;
     height: 100%;
     flex-shrink: 0;
-    min-width: 80px;
+    min-width: 5rem;
   }
 
   .elf-stats-info {
@@ -849,8 +859,7 @@ onMounted(async () => {
     gap: 1rem;
     border-left: 1px solid var(--vscode-sideBarSectionHeader-border);
     padding-left: 1rem;
-    width: 250px;
-
+    width: 15.5rem; /* 250px */
     flex-shrink: 0;
 
     .elf-stats-block {
@@ -867,7 +876,6 @@ onMounted(async () => {
       letter-spacing: 0.5px;
       margin-bottom: 0.2rem;
 
-      /* Стиль для названия секции */
       .elf-top-section-name {
         color: var(--vscode-textLink-foreground);
         text-transform: none;
@@ -882,7 +890,7 @@ onMounted(async () => {
         justify-content: space-between;
         font-size: 0.85rem;
         padding: 0.2rem 0.4rem;
-        border-radius: 4px;
+        border-radius: 0.2rem;
         cursor: pointer;
 
         &:hover {
@@ -893,7 +901,7 @@ onMounted(async () => {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          max-width: 150px;
+          max-width: 9rem;
           color: var(--vscode-textLink-foreground);
         }
 
@@ -911,7 +919,7 @@ onMounted(async () => {
   flex: 1;
   background-color: var(--vscode-sideBar-background);
   padding: 1rem;
-  border-radius: 10px;
+  border-radius: 0.6rem;
   overflow: auto;
   position: relative;
   min-width: 0;
@@ -922,12 +930,12 @@ onMounted(async () => {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: .5rem;
+  gap: 0.5rem;
 
   .view-section-icon {
+    padding: 0.5rem;
+    margin: -0.5rem;
     cursor: pointer;
-    padding: .5rem;
-    margin: -.5rem;
 
     &:hover {
       transition: 0.3s;
@@ -937,9 +945,9 @@ onMounted(async () => {
 }
 
 .elf-symbol-file {
-  cursor: pointer;
   color: var(--vscode-textLink-foreground);
   text-decoration: none;
+  cursor: pointer;
 
   &:hover {
     text-decoration: underline;
@@ -951,8 +959,8 @@ onMounted(async () => {
   background-color: var(--vscode-input-background);
   border: 1px solid var(--vscode-input-border, transparent);
   color: var(--vscode-input-foreground);
-  border-radius: 2px;
-  padding: .5rem;
+  border-radius: 0.2rem;
+  padding: 0.5rem;
   outline: none;
   box-sizing: border-box;
 
@@ -985,7 +993,7 @@ input[type="search"]::-webkit-search-cancel-button {
   padding: 1rem;
   background-color: var(--vscode-inputValidation-errorBackground);
   border: 1px solid var(--vscode-inputValidation-errorBorder);
-  border-radius: 10px;
+  border-radius: 0.6rem;
   max-width: 100%;
   overflow: hidden;
 
@@ -1027,14 +1035,14 @@ input[type="search"]::-webkit-search-cancel-button {
 .elf-modal {
   background-color: var(--vscode-editor-background);
   border: 1px solid var(--vscode-widget-border);
-  border-radius: 6px;
+  border-radius: 0.4rem;
   width: 100%;
-  max-width: 900px;
+  max-width: 56rem; /* 900px */
   margin: 2rem;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.3);
 
   .elf-modal-header {
     display: flex;
@@ -1075,10 +1083,10 @@ input[type="search"]::-webkit-search-cancel-button {
 
 .elf-diff-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(70px, auto) minmax(100px, auto);
+  grid-template-columns: minmax(0, 1fr) minmax(4.5rem, auto) minmax(6rem, auto);
   gap: 1rem;
   padding: 0.3rem 0.5rem;
-  border-radius: 4px;
+  border-radius: 0.25rem;
   font-family: var(--vscode-editor-font-family);
   font-size: 0.8rem;
   align-items: center;
