@@ -51,7 +51,10 @@
 
         <div class="elf-stats-info">
           <div class="elf-stats-block elf-top-symbols">
-            <div class="elf-stats-title">Top 15 Symbols</div>
+            <div class="elf-stats-title">
+              Top 15 Symbols
+              <span v-if="selectedSection" class="elf-top-section-name">({{ selectedSection  }})</span>
+            </div>
             <div class="elf-top-symbol-row" v-for="sym in topSymbols" :key="sym.address" @click="filter = sym.name"
               title="Click to filter">
               <span class="elf-top-name">{{ sym.name }}</span>
@@ -361,8 +364,16 @@ const formatBytes = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
+// Топ-15 символов (зависит от выбранной секции)
 const topSymbols = computed(() => {
-  return [...itemsFiltered.value]
+  let sourceItems = itemsFiltered.value;
+  
+  // Фильтруем только если выбрана конкретная секция
+  if (selectedSection.value) {
+    sourceItems = sourceItems.filter(x => x.section === selectedSection.value);
+  }
+
+  return [...sourceItems]
     .filter(x => x.size > 0)
     .sort((a, b) => b.size - a.size)
     .slice(0, 15);
@@ -441,11 +452,13 @@ const sortData = () => {
   symbols.value?.scrollTo(0, 0);
 };
 
-const sectionView = ref<string>('name');
+const sectionView = ref<string>('');
+const selectedSection = ref<string>('');
 const sectionData = ref<Array<MyStackItem>>([{ key: [], data: 0 }]);
 
 const sectionDataUpdate = async (section: string) => {
   sectionView.value = section;
+  selectedSection.value = section;
   const data = items.value
     .filter(x => x.section === section)
     .sort((a, b) => b.address - a.address)
@@ -466,8 +479,10 @@ const sectionDataUpdate = async (section: string) => {
 
 const sectionUpdate = async (section: string) => {
   filterBy("");
+  selectedSection.value = ''; 
+  sectionView.value = section; // Устанавливаем выбранную секцию
   sectionDataUpdate(section);
-}
+};
 
 const elfData = ref<Array<MyStackItem>>([{ key: [], data: 0, meta: "" }]);
 
@@ -521,8 +536,12 @@ const refresh = async () => {
     items.value = parsed.elements;
 
     if (items.value.length > 0) {
-      sectionDataUpdate(items.value[0]?.section ?? "");
+      const firstSection = items.value[0]?.section || 'text';
+      sectionView.value = firstSection;
+      sectionDataUpdate(firstSection);
     }
+
+    selectedSection.value = '';
     elfDataUpdate();
     ready.value = true;
     sortData();
@@ -847,6 +866,14 @@ onMounted(async () => {
       text-transform: uppercase;
       letter-spacing: 0.5px;
       margin-bottom: 0.2rem;
+
+      /* Стиль для названия секции */
+      .elf-top-section-name {
+        color: var(--vscode-textLink-foreground);
+        text-transform: none;
+        font-weight: normal;
+        margin-left: 0.5rem;
+      }
     }
 
     .elf-top-symbols {
