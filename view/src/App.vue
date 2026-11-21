@@ -150,7 +150,13 @@
           </div>
 
           <div class="elf-diff-item" v-for="item in sortedDiffItems" :key="item.name">
-            <span class="elf-diff-name">{{ item.name }}</span>
+            <span class="elf-diff-name" :title="item.oldName ? `Renamed from: ${item.oldName}` : ''">
+              <template v-if="item.oldName">
+                <span class="elf-diff-old-name">{{ item.oldName }}</span>
+                <span class="elf-diff-arrow">&rarr;</span>
+              </template>
+              {{ item.name }}
+            </span>
             <span class="elf-diff-size"
               :class="item.diff > 0 ? 'diff-plus' : (item.diff < 0 ? 'diff-minus' : 'diff-zero')">
               {{ item.diff > 0 ? '+' : '' }}{{ item.diff }}
@@ -608,7 +614,19 @@ const exportCsv = () => {
 };
 
 // --- DIFF ---
-const diffData = ref<{ sizeDiff: number; items: Array<{ name: string; oldSize: number; newSize: number; diff: number }> } | null>(null);
+
+// Добавь этот тип перед diffData
+type DiffItem = { 
+  name: string; 
+  oldName?: string; 
+  oldSize: number; 
+  newSize: number; 
+  diff: number; 
+  section: string;
+};
+
+const diffData = ref<{ sizeDiff: number; items: Array<DiffItem> } | null>(null);
+
 
 const sortedDiffItems = computed(() => {
   if (!diffData.value) return [];
@@ -636,48 +654,76 @@ useEventListener(window, 'message', (event: any) => {
 });
 
 const calculateDiff = (oldElements: ElfElement[]) => {
-  const oldMap = new Map<string, ElfElement>();
-  for (const el of oldElements) {
-    oldMap.set(el.name, el);
-  }
-
-  const newElements = items.value;
-  const diffItems: Array<{ name: string; oldSize: number; newSize: number; diff: number }> = [];
+  const newElements = [...items.value];
+  const diffItems: Array<DiffItem> = [];
   let totalSizeDiff = 0;
 
+  // Группируем старые элементы по имени для обработки дубликатов (static-функции)
+  const oldMap = new Map<string, ElfElement[]>();
+  for (const el of oldElements) {
+    if (!oldMap.has(el.name)) oldMap.set(el.name, []);
+    oldMap.get(el.name)!.push(el);
+  }
+
+  const matchedOld = new Set<ElfElement>();
+
+  // Проходим по новым элементам
   for (const newEl of newElements) {
-    const oldEl = oldMap.get(newEl.name);
-    const oldSize = oldEl ? oldEl.size : 0;
-    const diff = newEl.size - oldSize;
-
-    if (diff !== 0) {
-      diffItems.push({
-        name: newEl.name,
-        oldSize,
-        newSize: newEl.size,
-        diff
-      });
-      totalSizeDiff += diff;
+    const candidates = oldMap.get(newEl.name) || [];
+    
+    // Ищем среди старых кандидатов с таким же именем еще не сматченного
+    const matchIdx = candidates.findIndex(o => !matchedOld.has(o));
+    
+    if (matchIdx !== -1) {
+      // Нашли пару
+      const oldEl = candidates[matchIdx];
+      matchedOld.add(oldEl);
+      const diff = newEl.size - oldEl.size;
+      
+      // Показываем в списке только если размер реально изменился
+      if (diff !== 0) {
+        diffItems.push({ 
+          name: newEl.name, 
+          oldSize: oldEl.size, 
+          newSize: newEl.size, 
+          diff, 
+          section: newEl.section 
+        });
+        totalSizeDiff += diff;
+      }
+    } else {
+      // Это новый элемент
+      if (newEl.size > 0) {
+        diffItems.push({ 
+          name: newEl.name, 
+          oldSize: 0, 
+          newSize: newEl.size, 
+          diff: newEl.size, 
+          section: newEl.section 
+        });
+        totalSizeDiff += newEl.size;
+      }
     }
-    oldMap.delete(newEl.name);
   }
 
-  for (const [name, el] of oldMap) {
-    diffItems.push({
-      name,
-      oldSize: el.size,
-      newSize: 0,
-      diff: -el.size
-    });
-    totalSizeDiff -= el.size;
+  // Все оставшиеся старые элементы — это удаленные
+  for (const oldEl of oldElements) {
+    if (!matchedOld.has(oldEl) && oldEl.size > 0) {
+      diffItems.push({ 
+        name: oldEl.name, 
+        oldSize: oldEl.size, 
+        newSize: 0, 
+        diff: -oldEl.size, 
+        section: oldEl.section 
+      });
+      totalSizeDiff -= oldEl.size;
+    }
   }
 
-  diffData.value = {
-    sizeDiff: totalSizeDiff,
-    items: diffItems
-  };
+  // Сортируем по размеру изменений (сначала самые большие плюсы, потом минусы)
+  diffItems.sort((a, b) => b.diff - a.diff);
+  diffData.value = { sizeDiff: totalSizeDiff, items: diffItems };
 };
-
 const copyDiffToClipboard = () => {
   if (!diffData.value) return;
 
@@ -1107,6 +1153,18 @@ input[type="search"]::-webkit-search-cancel-button {
   font-family: var(--vscode-editor-font-family);
   font-size: 0.8rem;
   align-items: center;
+
+  .elf-diff-old-name {
+    color: var(--vscode-descriptionForeground);
+    text-decoration: line-through;
+    margin-right: 0.2rem;
+    font-size: 0.9em;
+  }
+
+  .elf-diff-arrow {
+    color: var(--vscode-descriptionForeground);
+    margin-right: 0.4rem;
+  }
 
   &:hover {
     background-color: var(--vscode-list-hoverBackground);
