@@ -1,4 +1,22 @@
+# Change Log
+
 All notable changes to the "devprodest-elf-analyzer" extension will be documented in this file.
+
+
+## 0.3.0
+
+### 🚀 New Features
+- **External Debug Files Support**: Automatically detects and parses `.gnu_debuglink` sections to load symbols and file paths from external `.debug` files.
+- **Universal Toolchain Resolution**: The extension now automatically searches for `llvm-nm`, standard `nm`, and `readelf`, supporting both LLVM and GCC toolchains out of the box.
+- **Smart Diff**: The Diff feature now handles renamed symbols and address shifts. It displays both old and new names for modified functions.
+- **UI Toggles**: Added settings (`show-charts`, `show-top-15`) to hide the charts or the Top-15 panel for a cleaner workspace.
+
+### 🛠️ UI/UX Improvements
+- **Toolchain Settings**: Introduced `toolchain-path` and `prefix` settings. The old `toolchain-nm-bin-path` is now deprecated.
+- **Truncated Paths**: File paths in grouped table headers are now truncated to match the main table view.
+
+### 🐛 Bug Fixes
+- Replaced the complex Diff scoring with exact-name matching to avoid false positives with duplicate and `OUTLINED_FUNCTION_*` symbols.
 
 
 ## 0.2.0
