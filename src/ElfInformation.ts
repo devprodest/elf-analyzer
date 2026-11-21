@@ -1,11 +1,47 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
 import * as fs from "fs";
+import * as path from "path";
 import { ElfElement, ElfInfo } from "../common/elfInfo";
 import * as vscode from 'vscode';
 import { logChannel } from "./extension";
 
 const execFileAsync = promisify(execFile);
+
+// Каскадный поиск нужной утилиты (nm или readelf)
+async function findTool(toolName: 'nm' | 'readelf'): Promise<string | null> {
+    const config = vscode.workspace.getConfiguration('devprodest-elf-analyzer');
+    const prefix = config.get<string>('prefix') || '';
+    const toolchainPath = config.get<string>('toolchain-path') || '';
+    const candidates: string[] = [];
+
+    // 1. Старая настройка (обратная совместимость)
+    if (toolName === 'nm') {
+        const legacy = config.get<string>('toolchain-nm-bin-path');
+        if (legacy) candidates.push(legacy);
+    }
+
+    // 2. Настройки папки и префикса
+    if (toolchainPath) {
+        candidates.push(path.join(toolchainPath, `${prefix}${toolName}`));
+    }
+    if (prefix) {
+        candidates.push(`${prefix}${toolName}`);
+    }
+
+    // 3. Стандартные фолбэки (LLVM -> GNU)
+    candidates.push(`llvm-${toolName}`, toolName);
+
+    for (const cmd of candidates) {
+        try {
+            await execFileAsync(cmd, ['--version'], { timeout: 1000 });
+            return cmd;
+        } catch (e) {
+            // Игнорируем ошибку и пробуем следующий
+        }
+    }
+    return null;
+}
 
 async function detectFormat(filePath: string): Promise<'elf' | 'macho' | 'pe' | 'unknown'> {
     const buffer = Buffer.alloc(4);
@@ -31,38 +67,46 @@ async function detectFormat(filePath: string): Promise<'elf' | 'macho' | 'pe' | 
 export async function getElfInfo(file: string): Promise<ElfInfo> {
     try {
         logChannel.info("get info from", file);
+        let targetFile = file;
 
-        const format = await detectFormat(file);
-        logChannel.info("detected format:", format);
-
-        const toolNM = vscode.workspace.getConfiguration()
-            .get<string>("devprodest-elf-analyzer.toolchain-nm-bin-path") ?? "llvm-nm";
-
-        let args: string[] = [];
-        let parser: (stdout: string) => ElfElement[];
-
-        if (format === 'macho') {
-            // Для Mach-O используем формат darwin
-            args = ["-m", "-S", "-l", file];
-            parser = parseMachOOutput;
-        } else {
-            // ELF по умолчанию
-            args = ["-S", "-l", "-t", "d", "--format=sysv", file];
-            parser = parseElfOutput;
+        // 1. Пытаемся найти внешний .debug файл
+        const readelf = await findTool('readelf');
+        if (readelf) {
+            try {
+                const { stdout } = await execFileAsync(readelf, ['--string-dump=.gnu_debuglink', file]);
+                const match = stdout.match(/\[\s*\d+\]\s+(.+)/);
+                if (match) {
+                    const debugName = match[1].trim().replace(/\0/g, '');
+                    const debugPath = path.join(path.dirname(file), debugName);
+                    if (fs.existsSync(debugPath)) {
+                        logChannel.info("Found separate debug file:", debugPath);
+                        targetFile = debugPath; // Меняем цель на .debug файл
+                    }
+                }
+            } catch (e) {
+                logChannel.info("No .gnu_debuglink found or failed to read.");
+            }
         }
 
-        const { stdout, stderr } = await execFileAsync(toolNM, args, {
+        // 2. Запускаем nm на найденном файле (оригинале или .debug)
+        const toolNM = await findTool('nm');
+        if (!toolNM) {
+            return { file, elements: [], error: "nm (or llvm-nm) not found in PATH or settings." };
+        }
+
+        // (Дальше стандартный код вызова nm для ELF)
+        const { stdout, stderr } = await execFileAsync(toolNM, ["-S", "-l", "-t", "d", "--format=sysv", targetFile], {
             maxBuffer: 64 * 1024 * 1024,
             windowsHide: true,
         });
 
-        const elements = parser(stdout);
+        const elements = parseElfOutput(stdout);
 
         if (elements.length === 0) {
             return {
                 file,
                 elements: [],
-                error: stderr.trim() || `No symbols found in this ${format.toUpperCase()} file.`,
+                error: stderr.trim() || "No symbols found in this file or its .debug link.",
             };
         }
 

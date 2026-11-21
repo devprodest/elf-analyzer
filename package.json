@@ -28,9 +28,30 @@
         "title": "ELF size analyzer",
         "properties": {
           "devprodest-elf-analyzer.toolchain-nm-bin-path": {
-            "default": "llvm-nm",
+            "default": "",
             "type": "string",
-            "description": "Path to 'llvm-nm' ar 'gcc-nm' execute file"
+            "description": "Path to 'nm' execute file",
+            "deprecationMessage": "This setting is deprecated. Use 'toolchain-path' and 'prefix' instead."
+          },
+          "devprodest-elf-analyzer.toolchain-path": {
+            "default": "",
+            "type": "string",
+            "description": "Path to the folder containing toolchain executables (e.g., 'nm', 'readelf')."
+          },
+          "devprodest-elf-analyzer.prefix": {
+            "default": "",
+            "type": "string",
+            "description": "Toolchain prefix (e.g., 'arm-none-eabi-', 'llvm-', or leave empty for native tools)."
+          },
+          "devprodest-elf-analyzer.show-charts": {
+            "default": true,
+            "type": "boolean",
+            "description": "Show section charts in the sidebar."
+          },
+          "devprodest-elf-analyzer.show-top-15": {
+            "default": true,
+            "type": "boolean",
+            "description": "Show the Top 15 symbols panel."
           }
         }
       }

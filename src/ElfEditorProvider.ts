@@ -78,9 +78,14 @@ export class ElfEditorProvider implements vscode.CustomReadonlyEditorProvider {
         });
 
         async function updateWebview() {
+            const config = vscode.workspace.getConfiguration('devprodest-elf-analyzer');
             webviewPanel.webview.postMessage({
                 type: 'update',
                 value: JSON.stringify(await getElfInfo(document.uri.fsPath)),
+                settings: {
+                    showCharts: config.get<boolean>('show-charts', true),
+                    showTop15: config.get<boolean>('show-top-15', true),
+                }
             });
         }
 

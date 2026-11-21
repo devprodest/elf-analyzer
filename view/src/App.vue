@@ -50,13 +50,13 @@
     <!-- НИЖНЯЯ ЧАСТЬ (Графики + Таблица) -->
     <div class="elf-content">
       <!-- Левая панель: Графики и Топ-15 -->
-      <div class="elf-statistics">
-        <div class="elf-stats-charts">
+      <div class="elf-statistics" v-if="showCharts || showTop15">
+        <div class="elf-stats-charts" v-if="showCharts">
           <MyStackChart :data=elfData @click="sectionUpdate">ELF section sizes</MyStackChart>
           <MyStackChart :data=sectionData @click="filterBy">{{ `Size of ${sectionView} section` }}</MyStackChart>
         </div>
 
-        <div class="elf-stats-info">
+        <div class="elf-stats-info" v-if="showTop15">
           <div class="elf-stats-block elf-top-symbols">
             <div class="elf-stats-title">
               Top 15 Symbols
@@ -212,7 +212,8 @@ const defaultState = {
 
 const savedState = getState<typeof defaultState>() || defaultState;
 
-
+const showCharts = ref(true);
+const showTop15 = ref(true);
 const filter = ref<string>(savedState.filter);
 const typeFilter = ref<string>(savedState.typeFilter);
 const sortBy = ref<string>(savedState.sortBy);
@@ -322,6 +323,11 @@ const sizeToHexOrDec = (val: number | undefined | null): string => {
   return radix.value === 'hex' ? toHEX(val) : val.toString(10);
 };
 
+const filenameCut = (filename: string): string => {
+  if (filename.length < 48) return filename;
+  return filename.substring(0, 10) + "..." + filename.slice(-36);
+};
+
 const itemsFiltered = computed(() => {
   let result = items.value;
 
@@ -399,18 +405,24 @@ const displayedRows = computed<TableRow[]>(() => {
     return itemsFiltered.value.map(item => ({ isGroup: false, item } as TableRow));
   }
 
-  const groups: Record<string, { count: number; totalSize: number; items: ElfElement[] }> = {};
+  const groups: Record<string, { count: number; totalSize: number; items: ElfElement[]; displayTitle: string }> = {};
 
   for (const item of itemsFiltered.value) {
     let key = "";
+    let displayTitle = "";
+
     if (groupBy.value === 'section') {
       key = item.section || "(no section)";
+      displayTitle = key;
     } else if (groupBy.value === 'file') {
       const match = item.line?.match(/(.*):\d+$/);
       key = match ? match[1] : (item.line || "(no file)");
+      displayTitle = filenameCut(key); // Обрезаем для отображения
     }
 
-    if (!groups[key]) groups[key] = { count: 0, totalSize: 0, items: [] };
+    if (!groups[key]) {
+      groups[key] = { count: 0, totalSize: 0, items: [], displayTitle };
+    }
     groups[key].count++;
     groups[key].totalSize += (item.size || 0);
     groups[key].items.push(item);
@@ -422,8 +434,8 @@ const displayedRows = computed<TableRow[]>(() => {
   for (const [key, group] of sortedGroups) {
     result.push({
       isGroup: true,
-      key,
-      title: key,
+      key, // Используется для сворачивания/разворачивания (должен быть уникальным)
+      title: group.displayTitle, // Используется для отображения (обрезанный)
       count: group.count,
       totalSize: group.totalSize,
       collapsed: collapsedGroups.value.has(key)
@@ -523,11 +535,6 @@ const filterBy = (data: string) => {
   filter.value = data;
 }
 
-const filenameCut = (filename: string): string => {
-  if (filename.length < 48) return filename;
-  return filename.substring(0, 10) + "..." + filename.slice(-36);
-};
-
 const ready = ref<boolean>(false);
 const error = ref<string>("");
 
@@ -614,6 +621,12 @@ const startCompare = () => {
 
 useEventListener(window, 'message', (event: any) => {
   const message = event.data;
+
+  if (message.type === 'update' && message.settings) {
+    showCharts.value = message.settings.showCharts;
+    showTop15.value = message.settings.showTop15;
+  }
+
   if (message.type === 'compare-result') {
     const oldInfo = JSON.parse(message.value) as ElfInfo;
     if (oldInfo && oldInfo.elements) {
@@ -765,7 +778,8 @@ onMounted(async () => {
     position: relative;
     display: flex;
     align-items: center;
-    width: 16rem; /* 256px */
+    width: 16rem;
+    /* 256px */
     flex-shrink: 0;
 
     input.vscode-input {
@@ -788,7 +802,8 @@ onMounted(async () => {
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 1.4rem; /* 22px */
+        width: 1.4rem;
+        /* 22px */
         height: 1.4rem;
         border-radius: 0.2rem;
         font-size: 0.85rem;
@@ -859,7 +874,8 @@ onMounted(async () => {
     gap: 1rem;
     border-left: 1px solid var(--vscode-sideBarSectionHeader-border);
     padding-left: 1rem;
-    width: 15.5rem; /* 250px */
+    width: 15.5rem;
+    /* 250px */
     flex-shrink: 0;
 
     .elf-stats-block {
@@ -1037,7 +1053,8 @@ input[type="search"]::-webkit-search-cancel-button {
   border: 1px solid var(--vscode-widget-border);
   border-radius: 0.4rem;
   width: 100%;
-  max-width: 56rem; /* 900px */
+  max-width: 56rem;
+  /* 900px */
   margin: 2rem;
   max-height: 90vh;
   display: flex;
