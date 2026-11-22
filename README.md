@@ -9,18 +9,18 @@ A powerful extension for getting detailed information about ELF files directly i
 ## Features
 
 * **Symbol Information**: View names, addresses, sizes, and sections of all symbols.
-* **External Debug Support**: Automatically detects `.gnu_debuglink` sections to load symbols and file paths from external `.debug` files (perfect for stripped binaries).
+* **Dead Code Detection**: Automatically identifies unreferenced local functions and variables to help you optimize binary size.
+* **External Debug Support**: Automatically detects `.gnu_debuglink` sections to load symbols and file paths from external `.debug` files.
 * **Interactive Charts**: Visualize section sizes and symbol distribution with stack charts.
 * **Grouping**: Group symbols by Section or File to see where the size is coming from.
-* **Top 15 Symbols**: Instantly see the largest symbols in your binary (globally or filtered by section). Click to filter the table.
+* **Top 15 Symbols**: Instantly see the largest symbols in your binary (globally or filtered by section).
 * **Type Filters**: Quickly filter symbols by their type (Func, Obj, Other).
-* **Smart Diff**: Compare your current build against a previous binary file to see exactly what grew or shrank. The diff intelligently handles renamed symbols and minor address shifts.
-* **Universal Toolchain**: Automatically works with both LLVM (`llvm-nm`, `llvm-readelf`) and GNU (`nm`, `readelf`) toolchains.
-* **Export to CSV**: Export your filtered data or diff results to a CSV file for reporting.
+* **Diff & Compare**: Compare your current build against a previous binary file to see exactly what grew or shrank.
+* **Universal Toolchain**: Automatically works with both LLVM (`llvm-nm`, `llvm-readelf`) and GNU (`nm`, `readelf`, `objdump`) toolchains.
+* **Export to CSV**: Export your filtered data or diff results to a CSV file.
 * **Advanced Search**: Use case-insensitive search, Regular Expressions, and hide empty symbols.
 * **Hex/Dec Toggle**: Switch between decimal and hexadecimal views for sizes.
 * **State Persistence**: Your filters, sorting, grouping, and collapsed states are saved automatically.
-* **Customizable UI**: Optionally hide charts and the Top-15 panel to save screen space.
 
 ## Supported Formats
 

@@ -3,6 +3,19 @@
 All notable changes to the "devprodest-elf-analyzer" extension will be documented in this file.
 
 
+## 0.4.0
+
+### 🚀 New Features
+- **Dead Code Detection**: The extension now automatically analyzes relocations and disassembly to find unreferenced local symbols. You can filter them using the new "Skull" button in the toolbar and see the estimated dead code size in the stats panel.
+- **Strikethrough UI**: Dead symbols are visually highlighted with a strikethrough in the table.
+
+### 🛠️ UI/UX Improvements
+- Added separator lines between statistic blocks in the sidebar for better readability.
+
+### 🐛 Bug Fixes
+- **Diff Algorithm**: Replaced the complex matching logic with exact name matching. This fixes false positives and prevents auto-generated `OUTLINED_FUNCTION_*` and duplicate `static` symbols from being incorrectly paired.
+
+
 ## 0.3.0
 
 ### 🚀 New Features
