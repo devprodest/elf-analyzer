@@ -30,6 +30,11 @@
         <MySegmentedControl v-model="typeFilter" :options="typeOptions" />
         <MySegmentedControl v-model="radix" :options="radixOptions" />
 
+        <MyButton @click="showDeadCodeOnly = !showDeadCodeOnly"
+          v-tooltip="'Show only potentially dead code (unreferenced)'" :active="showDeadCodeOnly">
+          <FontAwesomeIcon :icon="faSkull" />
+        </MyButton>
+
         <MyButton @click="hideEmpty = !hideEmpty"
           v-tooltip="hideEmpty ? 'Show symbols with size 0' : 'Hide symbols with size 0'" :active="hideEmpty">
           <FontAwesomeIcon :icon="hideEmpty ? faEyeSlash : faEye" />
@@ -49,6 +54,9 @@
 
     <!-- НИЖНЯЯ ЧАСТЬ (Графики + Таблица) -->
     <div class="elf-content">
+
+
+
       <!-- Левая панель: Графики и Топ-15 -->
       <div class="elf-statistics" v-if="showCharts || showTop15">
         <div class="elf-stats-charts" v-if="showCharts">
@@ -68,6 +76,13 @@
               <span class="elf-top-size">{{ formatBytes(sym.size) }}</span>
             </div>
           </div>
+          <div class="elf-stats-block">
+            <div class="elf-stats-title">Dead Code (estimated)</div>
+            <div class="elf-stats-row">
+              <span>Size: </span>
+              <strong>{{ formatBytes(deadCodeSize) }}</strong>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -75,6 +90,12 @@
       <div class="elf-symbols" ref="elf-symbols">
         <MyTable :fields="fields" v-model:sortby="sortBy" v-model:sortdesc="sortDesc" :items=displayedRows
           @sortchange="sortData" @togglegroup="toggleGroup">
+
+          <template v-slot:name="name">
+            <span :class="{ 'dead-code': name.item.isDead }">
+              {{ name.data }}
+            </span>
+          </template>
 
           <template v-slot:address="address">
             <pre>{{ toHEX(address.data) }}</pre>
@@ -150,13 +171,7 @@
           </div>
 
           <div class="elf-diff-item" v-for="item in sortedDiffItems" :key="item.name">
-            <span class="elf-diff-name" :title="item.oldName ? `Renamed from: ${item.oldName}` : ''">
-              <template v-if="item.oldName">
-                <span class="elf-diff-old-name">{{ item.oldName }}</span>
-                <span class="elf-diff-arrow">&rarr;</span>
-              </template>
-              {{ item.name }}
-            </span>
+            <span class="elf-diff-name" :title="item.oldName ? `Renamed from: ${item.oldName}` : ''">{{ item.name }}</span>
             <span class="elf-diff-size"
               :class="item.diff > 0 ? 'diff-plus' : (item.diff < 0 ? 'diff-minus' : 'diff-zero')">
               {{ item.diff > 0 ? '+' : '' }}{{ item.diff }}
@@ -181,7 +196,7 @@ import MyStackChart, { type MyStackItem } from './components/general/MyStackChar
 import { sendMessage } from '../../common/utils';
 
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { faEye, faEyeSlash, faCode, faAnglesDown, faAnglesUp, faRotateRight, faFileCsv, faCodeCompare, faCopy, faXmark, faRotate, faList, faFolderTree, faFileCode, faCubes, faSquareRootVariable, faDatabase, faQuestion, fa1, faHashtag } from '@fortawesome/free-solid-svg-icons';
+import { faEye, faEyeSlash, faCode, faAnglesDown, faAnglesUp, faRotateRight, faFileCsv, faCodeCompare, faCopy, faXmark, faRotate, faSkull } from '@fortawesome/free-solid-svg-icons';
 
 const getState = <T,>(): T | undefined => {
   // @ts-ignore
@@ -214,6 +229,7 @@ const defaultState = {
   collapsedGroups: [] as string[],
   hideEmpty: false,
   useRegex: false,
+  showDeadCodeOnly: false
 };
 
 const savedState = getState<typeof defaultState>() || defaultState;
@@ -229,6 +245,7 @@ const radix = ref<string>(savedState.radix);
 const collapsedGroups = ref<Set<string>>(new Set(savedState.collapsedGroups));
 const hideEmpty = ref<boolean>(savedState.hideEmpty);
 const useRegex = ref<boolean>(savedState.useRegex);
+const showDeadCodeOnly = ref<boolean>(savedState.showDeadCodeOnly);
 
 const saveState = () => {
   setState({
@@ -241,10 +258,11 @@ const saveState = () => {
     collapsedGroups: Array.from(collapsedGroups.value),
     hideEmpty: hideEmpty.value,
     useRegex: useRegex.value,
+    showDeadCodeOnly: showDeadCodeOnly.value
   });
 };
 
-watch([filter, sortBy, sortDesc, groupBy, radix, typeFilter, hideEmpty, useRegex], saveState);
+watch([filter, sortBy, sortDesc, groupBy, radix, typeFilter, hideEmpty, useRegex, showDeadCodeOnly], saveState);
 watch(collapsedGroups, saveState, { deep: true });
 
 
@@ -341,6 +359,10 @@ const itemsFiltered = computed(() => {
     result = result.filter(x => x.size > 0);
   }
 
+  if (showDeadCodeOnly.value) {
+    result = result.filter(x => x.isDead);
+  }
+
   if (typeFilter.value !== 'all') {
     result = result.filter(x => {
       const type = x.type?.toUpperCase() || '';
@@ -377,6 +399,10 @@ const itemsFiltered = computed(() => {
     x.section?.toLowerCase().includes(qLower) ||
     x.line?.toLowerCase().includes(qLower)
   );
+});
+
+const deadCodeSize = computed(() => {
+  return itemsFiltered.value.filter(x => x.isDead).reduce((sum, x) => sum + x.size, 0);
 });
 
 const totalFilteredSize = computed(() => {
@@ -616,12 +642,12 @@ const exportCsv = () => {
 // --- DIFF ---
 
 // Добавь этот тип перед diffData
-type DiffItem = { 
-  name: string; 
-  oldName?: string; 
-  oldSize: number; 
-  newSize: number; 
-  diff: number; 
+type DiffItem = {
+  name: string;
+  oldName?: string;
+  oldSize: number;
+  newSize: number;
+  diff: number;
   section: string;
 };
 
@@ -670,36 +696,36 @@ const calculateDiff = (oldElements: ElfElement[]) => {
   // Проходим по новым элементам
   for (const newEl of newElements) {
     const candidates = oldMap.get(newEl.name) || [];
-    
+
     // Ищем среди старых кандидатов с таким же именем еще не сматченного
     const matchIdx = candidates.findIndex(o => !matchedOld.has(o));
-    
+
     if (matchIdx !== -1) {
       // Нашли пару
       const oldEl = candidates[matchIdx];
       matchedOld.add(oldEl);
       const diff = newEl.size - oldEl.size;
-      
+
       // Показываем в списке только если размер реально изменился
       if (diff !== 0) {
-        diffItems.push({ 
-          name: newEl.name, 
-          oldSize: oldEl.size, 
-          newSize: newEl.size, 
-          diff, 
-          section: newEl.section 
+        diffItems.push({
+          name: newEl.name,
+          oldSize: oldEl.size,
+          newSize: newEl.size,
+          diff,
+          section: newEl.section
         });
         totalSizeDiff += diff;
       }
     } else {
       // Это новый элемент
       if (newEl.size > 0) {
-        diffItems.push({ 
-          name: newEl.name, 
-          oldSize: 0, 
-          newSize: newEl.size, 
-          diff: newEl.size, 
-          section: newEl.section 
+        diffItems.push({
+          name: newEl.name,
+          oldSize: 0,
+          newSize: newEl.size,
+          diff: newEl.size,
+          section: newEl.section
         });
         totalSizeDiff += newEl.size;
       }
@@ -709,12 +735,12 @@ const calculateDiff = (oldElements: ElfElement[]) => {
   // Все оставшиеся старые элементы — это удаленные
   for (const oldEl of oldElements) {
     if (!matchedOld.has(oldEl) && oldEl.size > 0) {
-      diffItems.push({ 
-        name: oldEl.name, 
-        oldSize: oldEl.size, 
-        newSize: 0, 
-        diff: -oldEl.size, 
-        section: oldEl.section 
+      diffItems.push({
+        name: oldEl.name,
+        oldSize: oldEl.size,
+        newSize: 0,
+        diff: -oldEl.size,
+        section: oldEl.section
       });
       totalSizeDiff -= oldEl.size;
     }
@@ -917,17 +943,22 @@ onMounted(async () => {
   .elf-stats-info {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.5rem;
     border-left: 1px solid var(--vscode-sideBarSectionHeader-border);
     padding-left: 1rem;
     width: 15.5rem;
-    /* 250px */
     flex-shrink: 0;
 
     .elf-stats-block {
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
+
+      /* Линия и отступ для всех блоков, КРОМЕ первого */
+      &:not(:first-child) {
+        border-top: 1px solid var(--vscode-sideBarSectionHeader-border);
+        padding-top: 1.5rem;
+      }
     }
 
     .elf-stats-title {
@@ -1211,5 +1242,11 @@ input[type="search"]::-webkit-search-cancel-button {
   .diff-zero {
     color: var(--vscode-descriptionForeground);
   }
+}
+
+.dead-code {
+  color: var(--vscode-disabledForeground);
+  text-decoration: line-through;
+  opacity: 0.6;
 }
 </style>

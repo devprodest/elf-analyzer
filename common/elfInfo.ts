@@ -7,6 +7,7 @@ export type ElfElement = {
     type: string,
     size: number,
     section: string,
+    isDead?: boolean,
     line?: string,
 }
 

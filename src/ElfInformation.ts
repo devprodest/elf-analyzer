@@ -8,28 +8,21 @@ import { logChannel } from "./extension";
 
 const execFileAsync = promisify(execFile);
 
-// Каскадный поиск нужной утилиты (nm или readelf)
-async function findTool(toolName: 'nm' | 'readelf'): Promise<string | null> {
+// Каскадный поиск нужной утилиты (nm, readelf или objdump)
+async function findTool(toolName: 'nm' | 'readelf' | 'objdump'): Promise<string | null> {
     const config = vscode.workspace.getConfiguration('devprodest-elf-analyzer');
     const prefix = config.get<string>('prefix') || '';
     const toolchainPath = config.get<string>('toolchain-path') || '';
     const candidates: string[] = [];
 
-    // 1. Старая настройка (обратная совместимость)
     if (toolName === 'nm') {
         const legacy = config.get<string>('toolchain-nm-bin-path');
         if (legacy) candidates.push(legacy);
     }
 
-    // 2. Настройки папки и префикса
-    if (toolchainPath) {
-        candidates.push(path.join(toolchainPath, `${prefix}${toolName}`));
-    }
-    if (prefix) {
-        candidates.push(`${prefix}${toolName}`);
-    }
+    if (toolchainPath) candidates.push(path.join(toolchainPath, `${prefix}${toolName}`));
+    if (prefix) candidates.push(`${prefix}${toolName}`);
 
-    // 3. Стандартные фолбэки (LLVM -> GNU)
     candidates.push(`llvm-${toolName}`, toolName);
 
     for (const cmd of candidates) {
@@ -37,7 +30,7 @@ async function findTool(toolName: 'nm' | 'readelf'): Promise<string | null> {
             await execFileAsync(cmd, ['--version'], { timeout: 1000 });
             return cmd;
         } catch (e) {
-            // Игнорируем ошибку и пробуем следующий
+            // ignore
         }
     }
     return null;
@@ -52,16 +45,29 @@ async function detectFormat(filePath: string): Promise<'elf' | 'macho' | 'pe' | 
     if (buffer[0] === 0x7F && buffer[1] === 0x45 && buffer[2] === 0x4C && buffer[3] === 0x46) {
         return 'elf';
     }
-    // Mach-O: CF FA ED FE (64-bit LE) или FE ED FA CF (64-bit BE)
     if ((buffer[0] === 0xCF && buffer[1] === 0xFA && buffer[2] === 0xED && buffer[3] === 0xFE) ||
         (buffer[0] === 0xFE && buffer[1] === 0xED && buffer[2] === 0xFA && buffer[3] === 0xCF)) {
         return 'macho';
     }
-    // PE: MZ
     if (buffer[0] === 0x4D && buffer[1] === 0x5A) {
         return 'pe';
     }
     return 'unknown';
+}
+
+function markDeadCode(elements: ElfElement[], referencedSymbols: Set<string>) {
+    // Символы, которые не должны помечаться как мертвые (точки входа)
+    const keepAlive = ['main', '_start', 'Reset_Handler', 'Default_Handler', '_exit', 'exit', '__libc_init_array'];
+
+    for (const el of elements) {
+        // Проверяем только локальные символы (t, d, b, r - строчные буквы)
+        // Заглавные буквы (T, D, B, R) — это глобальные символы, они не могут быть удалены линкером
+        if (el.class && el.class === el.class.toLowerCase() && el.class.match(/[tdbr]/)) {
+            if (!referencedSymbols.has(el.name) && !keepAlive.includes(el.name)) {
+                el.isDead = true;
+            }
+        }
+    }
 }
 
 export async function getElfInfo(file: string): Promise<ElfInfo> {
@@ -80,7 +86,7 @@ export async function getElfInfo(file: string): Promise<ElfInfo> {
                     const debugPath = path.join(path.dirname(file), debugName);
                     if (fs.existsSync(debugPath)) {
                         logChannel.info("Found separate debug file:", debugPath);
-                        targetFile = debugPath; // Меняем цель на .debug файл
+                        targetFile = debugPath;
                     }
                 }
             } catch (e) {
@@ -88,25 +94,72 @@ export async function getElfInfo(file: string): Promise<ElfInfo> {
             }
         }
 
-        // 2. Запускаем nm на найденном файле (оригинале или .debug)
+        // 2. Запускаем nm на найденном файле
         const toolNM = await findTool('nm');
         if (!toolNM) {
             return { file, elements: [], error: "nm (or llvm-nm) not found in PATH or settings." };
         }
 
-        // (Дальше стандартный код вызова nm для ELF)
-        const { stdout, stderr } = await execFileAsync(toolNM, ["-S", "-l", "-t", "d", "--format=sysv", targetFile], {
+        const format = await detectFormat(targetFile);
+        let args: string[] = [];
+        let parser: (stdout: string) => ElfElement[];
+
+        if (format === 'macho') {
+            args = ["-m", "-S", "-l", targetFile];
+            parser = parseMachOOutput;
+        } else {
+            args = ["-S", "-l", "-t", "d", "--format=sysv", targetFile];
+            parser = parseElfOutput;
+        }
+
+        const { stdout, stderr } = await execFileAsync(toolNM, args, {
             maxBuffer: 64 * 1024 * 1024,
             windowsHide: true,
         });
 
-        const elements = parseElfOutput(stdout);
+        const elements = parser(stdout);
+
+        // 3. Поиск мертвого кода (только для ELF)
+        if (format === 'elf') {
+            try {
+                logChannel.info("Running disassembly and relocations for dead code analysis...");
+                const referencedSymbols = new Set<string>();
+
+                // 3.1. Ищем вызовы функций через objdump -d
+                const toolObjdump = await findTool('objdump');
+                if (toolObjdump) {
+                    const { stdout: objdumpStdout } = await execFileAsync(toolObjdump, ["-d", targetFile], {
+                        maxBuffer: 64 * 1024 * 1024,
+                        windowsHide: true
+                    });
+                    // Ищем все имена в угловых скобках (например: bl 8000a1c <my_function>)
+                    const matches = objdumpStdout.matchAll(/<([^>]+)>/g);
+                    for (const match of matches) {
+                        const name = match[1].split('+')[0].trim();
+                        if (name) referencedSymbols.add(name);
+                    }
+                }
+
+                // 3.2. Ищем указатели на данные через readelf -r
+                if (readelf) {
+                    const { stdout: readelfStdout } = await execFileAsync(readelf, ["-r", targetFile]);
+                    const matches = readelfStdout.matchAll(/R_[A-Z0-9_]+\s+[0-9a-fA-F]+\s+([^\s+]+)/g);
+                    for (const match of matches) {
+                        referencedSymbols.add(match[1]);
+                    }
+                }
+
+                markDeadCode(elements, referencedSymbols);
+            } catch (e) {
+                logChannel.warn("Failed to analyze dead code:", e);
+            }
+        }
 
         if (elements.length === 0) {
             return {
                 file,
                 elements: [],
-                error: stderr.trim() || "No symbols found in this file or its .debug link.",
+                error: stderr.trim() || `No symbols found in this ${format.toUpperCase()} file.`,
             };
         }
 
@@ -122,26 +175,41 @@ export async function getElfInfo(file: string): Promise<ElfInfo> {
 }
 
 function parseElfOutput(stdout: string): ElfElement[] {
-    const rawlines = stdout
-        .split("\n")
-        .map(l => l.split("|"))
-        .filter(l => l.length > 6);
-
+    const lines = stdout.split("\n");
     const elements: ElfElement[] = [];
 
-    for (const l of rawlines) {
-        const field = l.map(f => f.trim());
-        if (!field[0] || field[0] === "Name") continue;
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("Name")) continue;
 
-        const sectionLine = field[6].match(/^(\.[\w.]+)\s*(.*)/);
-        const address = parseInt(field[1], 10);
-        const size = parseInt(field[4], 10);
+        let objectFile = "";
+        let restOfLine = trimmed;
+
+        const fileMatch = trimmed.match(/^([^|]+\.(o|obj|a|elf)):\s*(.*)$/i);
+        if (fileMatch) {
+            objectFile = fileMatch[1];
+            restOfLine = fileMatch[3];
+        } else {
+            const colonMatch = trimmed.match(/^([^|]+):\s*(.*)$/);
+            if (colonMatch && trimmed.includes("|")) {
+                objectFile = colonMatch[1].trim();
+                restOfLine = colonMatch[2];
+            }
+        }
+
+        const parts = restOfLine.split("|").map(p => p.trim());
+        if (parts.length < 5) continue;
+
+        const name = parts[0];
+        const address = parseInt(parts[1], 10);
+        const size = parseInt(parts[4], 10);
+        const sectionLine = parts[6] ? parts[6].match(/^(\.[\w.]+)\s*(.*)/) : null;
 
         elements.push({
-            name: field[0],
+            name: name,
             address: isNaN(address) ? 0 : address,
-            class: field[2],
-            type: field[3],
+            class: parts[2] || "",
+            type: parts[3] || "",
             size: isNaN(size) ? 0 : size,
             section: sectionLine?.[1] ?? "",
             line: sectionLine?.[2]?.trim() ?? "",
@@ -151,18 +219,12 @@ function parseElfOutput(stdout: string): ElfElement[] {
 }
 
 function parseMachOOutput(stdout: string): ElfElement[] {
-    // Формат вывода darwin (llvm-nm -m) выглядит примерно так:
-    // 0000000000000000 (__TEXT,__text) external _main
-    // или
-    // 0000000000000000 (__DATA,__data) non-external _foo
     const lines = stdout.split("\n").filter(l => l.trim().length > 0);
     const elements: ElfElement[] = [];
 
     for (const line of lines) {
-        // Пропускаем заголовки и пустые строки
         if (line.startsWith("Name") || line.startsWith("---")) continue;
 
-        // Регулярка для парсинга: адрес, (сегмент,секция), флаги, имя
         const match = line.match(/^([0-9a-fA-F]+)\s+\(([^,]+),([^)]+)\)\s+(.*?)\s+([^\s].*)$/);
         if (!match) continue;
 
@@ -172,29 +234,21 @@ function parseMachOOutput(stdout: string): ElfElement[] {
         const rest = match[4];
         const name = match[5];
 
-        // Определяем тип по флагам (external/non-external и т.д.)
-        // Для простоты считаем все функции FUNC, данные OBJECT
-        // В Mach-O точный тип (FUNC/OBJECT) не всегда очевиден из nm, но можно ориентироваться на секцию
         let type = "OBJECT";
         if (section === "__text") type = "FUNC";
         if (section === "__bss") type = "OBJECT";
 
-        // Размер в Mach-O nm не выводится напрямую (только адрес).
-        // Мы можем вычислить его позже, отсортировав по адресу и найдя разницу.
-        // Пока ставим 0, размер будет вычислен на фронтенде или отдельным проходом.
         elements.push({
             name,
             address: isNaN(address) ? 0 : address,
             class: rest.includes("external") ? "T" : "t",
             type,
-            size: 0, // Будет вычислено позже
+            size: 0,
             section: `${segment},${section}`,
             line: "",
         });
     }
 
-    // Вычисляем размеры: сортируем по адресу, размер = следующий_адрес - текущий_адрес
-    // Это приблизительно, но для nm это стандартный подход
     elements.sort((a, b) => a.address - b.address);
     for (let i = 0; i < elements.length - 1; i++) {
         if (elements[i].address > 0) {

@@ -103,11 +103,8 @@ const sections = computed<Array<StackItem>>(() => {
 
     .my-stack-item {
         width: 100%;
-        min-height: 2px;
         transition: 0.3s;
         background-color: var(--vscode-editor-foreground);
-
-        /* Убираем flex-basis: 0, но добавляем flex-grow: 1 */
         flex-grow: 1;
         flex-shrink: 1;
 
