@@ -92,9 +92,7 @@
           @sortchange="sortData" @togglegroup="toggleGroup">
 
           <template v-slot:name="name">
-            <span :class="{ 'dead-code': name.item.isDead }">
               {{ name.data }}
-            </span>
           </template>
 
           <template v-slot:address="address">
@@ -1242,11 +1240,5 @@ input[type="search"]::-webkit-search-cancel-button {
   .diff-zero {
     color: var(--vscode-descriptionForeground);
   }
-}
-
-.dead-code {
-  color: var(--vscode-disabledForeground);
-  text-decoration: line-through;
-  opacity: 0.6;
 }
 </style>
