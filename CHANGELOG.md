@@ -3,6 +3,12 @@
 All notable changes to the "devprodest-elf-analyzer" extension will be documented in this file.
 
 
+## 0.4.1
+
+### 🐛 Bug Fixes
+- Removed the strikethrough text style for potentially dead code symbols. This fixes visual clutter in ELFs that heavily use function pointers, making the main table hard to read.
+
+
 ## 0.4.0
 
 ### 🚀 New Features
